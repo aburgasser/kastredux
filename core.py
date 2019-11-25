@@ -27,11 +27,12 @@ from scipy.integrate import trapz		# for numerical integration
 from scipy.interpolate import interp1d
 
 if sys.version_info.major != 2 and sys.version_info.major != 3:
-	raise NameError('\nKAST Redux only works on Python 2.7 and 3.X\n')
+	raise NameError('\nKASTREDUX only works on Python 2.7 and 3.X\n')
 if sys.version_info.major == 2:	 # switch for those using python 3
 	import string
 
-VERSION = '2019.10.17'
+NAME = 'kastredux'
+VERSION = '2019.11.25'
 __version__ = VERSION
 DEFAULT_WAVE_UNIT = u.Angstrom
 DEFAULT_FLUX_UNIT = u.erg/u.cm/u.cm/u.Angstrom/u.s
@@ -43,12 +44,33 @@ DISPERSIONS = {
 	'600/7500': {'RESOLUTION': 1.3, 'TILT_COEFF': [2.23,-4687]},
 }
 CCD_PARAMETERS = {'GAIN': 0.55, 'RN': 4.3}
-FLUXCALFOLDER = '/Users/adam/python_codes/kastredux/resources/flux_standards/'
+
+#set the CODE_PATH, either from set environment variable or from PYTHONPATH or from sys.path
+CODE_PATH = './'
+if os.environ.get('{}_PATH'.format(NAME.upper())) != None:
+    CODE_PATH = os.environ['{}_PATH'.format(NAME.upper())]
+# get from PYTHONPATH
+if os.environ.get('PYTHONPATH') != None and CODE_PATH == './':
+    path = os.environ['PYTHONPATH']
+    for i in path.split(':'):
+        if NAME in i or NAME.upper() in i:
+            CODE_PATH = i
+# get from system path
+if CODE_PATH == './':
+    checkpath = [NAME in r for r in sys.path]
+    if max(checkpath):
+        CODE_PATH = sys.path[checkpath.index(max(checkpath))]
+    checkpath = [NAME.upper() in r for r in sys.path]
+    if max(checkpath):
+        CODE_PATH = sys.path[checkpath.index(max(checkpath))]
+
+# RESOURCE DATA
+FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
 FLUXCALS = {
 	'FEIGE110': {'FILE' : 'ffeige110.dat'},
 	'HILTNER600': {'FILE' : 'fhilt600.dat'},
 }
-SPTSTDFOLDER = '/Users/adam/python_codes/kastredux/resources/spectral_standards/'
+SPTSTDFOLDER = CODE_PATH+'/resources/spectral_standards/'
 SPTSTDS = {}
 PLOT_DEFAULTS = {'figsize': [6,4], 'fontsize': 16,
 'color': 'k', 'ls': '-', 'alpha': 1, 
@@ -58,6 +80,7 @@ PLOT_DEFAULTS = {'figsize': [6,4], 'fontsize': 16,
 'zero_color': 'k', 'zero_ls': '--', 'zero_alpha': 1,
 }
 ERROR_CHECKING = True
+
 
 # SPECTRUM CLASS
 class Spectrum(object):
@@ -121,26 +144,27 @@ class Spectrum(object):
 		'''
 		:Purpose: Cleans up spectrum elements to make sure they are properly configured
 		'''
-		try:
-			funit = self.flux.unit
-		except:
-			funit = DEFAULT_FLUX_UNIT
-		try:
-			wunit = self.wave.unit
-		except:
-			wunit = DEFAULT_WAVE_UNIT
+# set up units
+		try: funit = self.flux.unit
+		except: funit = DEFAULT_FLUX_UNIT
+		try: wunit = self.wave.unit
+		except: wunit = DEFAULT_WAVE_UNIT
 
+# clean wavelength vector
 		if isUnit(self.wave):
 			self.wave = numpy.array(self.wave.value)*wunit
 		else:
 			self.wave = numpy.array(self.wave)*wunit
 
+# clean flux vector
 		for k in ['flux','unc','background']:
 			if isUnit(getattr(self,k)):
 				setattr(self,k,numpy.array(getattr(self,k).value)*funit)
 			else:
 				setattr(self,k,numpy.array(getattr(self,k))*funit)
+# set variance
 		self.variance = self.unc**2
+# need to: 
 		self.history.append('Spectrum cleaned')
 
 		return
