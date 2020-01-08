@@ -1,0 +1,101 @@
+KASTREDUX: KAST optical spectral reduction package
+**************************************************
+
+KASTREDUX is a python-based spectral reduction package for the
+Lick/KAST spectrograph.
+
+
+Installation and Dependencies
+=============================
+
+KASTREDUX can be cloned from the github site
+https://github.com/aburgasser/kastredux. which is updated on a regular
+basis. More detailed instructions are on the installation page.
+
+KASTREDUX has the following external dependencies:
+   * astropy
+
+   * matplotlib
+
+   * numpy
+
+   * pandas
+
+   * scipy
+
+To make sure the code can access associated data files, you need to
+set the code path, which can be done in the following wayss:
+
+   * include the path to the kastredux top-level folder in your
+     system "PATH" environmental variable
+
+   * include the path to the kastredux top-level folder in your
+     "PYTHONPATH" environmental variable
+
+   * set a new environmental variable called "KASTREDUX_PATH" to the
+     kastredux top-level folder
+
+KASTREDUX has been tested on python 3.6.x.
+
+KASTREDUX has not yet reached v1.0, so bugs are likely. Please help us
+squish them by sending bug reports to aburgasser@ucsd.edu or start an
+issue on the github site
+https://github.com/aburgasser/kastredux/issues.
+
+
+Acknowledgements
+================
+
+TBD
+
+*Contents*
+
+* KASTREDUX Reduction Instructions
+
+  * Overview of reduction procedures
+
+  * Downloading and organizing your data
+
+  * Preparing the input script
+
+    * Commands for Data Organization and Calibration
+
+    * Commands for Spectral Reduction
+
+    * Additional Extraction Keywords
+
+    * Additional Commands
+
+    * Providing inputs through the program call
+
+  * Calling the program reduce()
+
+  * Outputs
+
+    * KASTREDUX: KAST optical spectral reduction package
+
+    * API
+
+* API
+
+  * Spectrum Class
+
+  * Routines
+
+    * Imaging data reduction
+
+    * Spectral data reduction
+
+    * Imaging data manipulation
+
+    * Spectrum manipulation
+
+    * Other helper functions
+
+*Search*
+
+* Index
+
+* Module Index
+
+* Search Page
