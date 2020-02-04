@@ -937,7 +937,7 @@ def readSpectrum(filename,file_type='',delimiter='\s+',comment='#',columns=['wav
 			header = data[0].header
 		sp = Spectrum(wave=d[0,:]*wave_unit,flux=d[1,:]*flux_unit,header=header)
 		if len(d[:,0])>2:
-			for i in range(2,numpy.max([len(columns),len(d[:,0])])):
+			for i in range(2,numpy.min([len(columns),len(d[:,0])])):
 				setattr(sp,columns[i],d[i,:])
 		sp.clean()
 
@@ -1060,6 +1060,67 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 		if plot_file!='': fig.figure.savefig(plot_file)
 
 	return stat, scale_factor
+
+def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwargs):
+	'''
+	A very stripped down version of compareSpectra() to address errors 
+	'''
+	sp2 = copy.deepcopy(sp2orig)
+	sp2.convertWave(sp1.wave.unit)
+	sp2.convertFlux(sp1.flux.unit)
+	wave = sp1.wave.value
+	f1 = sp1.flux.value
+	u1 = sp1.unc.value
+	f2interp = interp1d(sp2.wave.value,sp2.flux.value,bounds_error=False,fill_value=0.)
+	f2 = f2interp(wave)
+	vtot = u1**2
+	weights = numpy.ones(len(wave))
+	if len(fit_range)>1:
+		weights[wave<numpy.nanmin(fit_range)]=0
+		weights[wave>numpy.nanmax(fit_range)]=0
+	scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*f2*f2/vtot)
+	stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
+	if plot==True: 
+		# plt.clf()
+		# plt.figure(figsize=[8,4])
+		# plt.plot(wave,f2*scale_factor,'r-')
+		# plt.plot(wave,f1,'k-')
+		# plt.plot(wave,f1-f2*scale_factor,'k--')
+		# plt.fill_between(wave,-1.*u1,u1,color='k',alpha=0.1)
+		# plt.xlim([numpy.nanmin(wave),numpy.nanmax(wave)])
+		# plt.ylim([-3.*numpy.nanquantile(u1,0.95),numpy.nanquantile(f1,0.95)])
+#
+		xlim = kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)])
+		ylim = kwargs.get('ylim',[-2.*numpy.nanquantile(u1,0.95),numpy.nanquantile(f1,0.95)])
+		f,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
+		ax1.plot(wave,f1,c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
+		ax1.plot(wave,f2*scale_factor,c=kwargs.get('color',PLOT_DEFAULTS['comparison_color']),ls=kwargs.get('ls',PLOT_DEFAULTS['comparison_ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['comparison_alpha']))
+		ax1.legend(kwargs.get('legend',[sp1.name,sp2.name]),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		ax1.plot(wave,u1,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
+		ax1.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
+		ax1.fill_between(wave,-1.*u1,u1,facecolor='k',alpha=0.1)
+#		ax1.set_xlim(kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)]))
+		ax1.set_xlim(xlim)
+		ax1.set_ylim(ylim)
+		ax1.set_ylabel(kwargs.get('ylabel',r'Flux ({})'.format(sp1.flux.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+#		ax1.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+#		ax1.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		diff = f1-f2*scale_factor
+		ylim2 = kwargs.get('ylim2',[-3.*numpy.nanstd(diff),3.*numpy.nanstd(diff)])
+		ax2.plot(wave,diff,c=kwargs.get('background_color',PLOT_DEFAULTS['background_color']),ls=kwargs.get('background_ls',PLOT_DEFAULTS['background_ls']),alpha=kwargs.get('background_alpha',PLOT_DEFAULTS['background_alpha']))
+		ax2.plot(wave[weights==1],diff[weights==1],c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
+		ax2.fill_between(wave,u1,-1.*u1,facecolor=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),linestyle=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
+#		ax2.plot(wave,-1.*sp.unc.value,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
+		ax2.set_xlabel(kwargs.get('xlabel',r'Wavelength ({})'.format(sp1.wave.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		ax2.set_ylabel(kwargs.get('ylabel','O-C'),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		ax2.set_xlim(xlim)
+		ax2.set_ylim(ylim2)
+#		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+#		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
+		if plot_file!='': fig.figure.savefig(plot_file)
+	return stat,scale_factor
+
 
 
 def combineSpectra():
