@@ -38,7 +38,7 @@ if sys.version_info.major == 2:	 # switch for those using python 3
 	import string
 
 NAME = 'kastredux'
-VERSION = '2019.12.16'
+VERSION = '2020.01.16'
 __version__ = VERSION
 DEFAULT_WAVE_UNIT = u.Angstrom
 DEFAULT_FLUX_UNIT = u.erg/u.cm/u.cm/u.Angstrom/u.s
@@ -55,6 +55,8 @@ CCD_PARAMETERS = {'GAIN': 0.55, 'RN': 4.3}
 CODE_PATH = ''
 if os.environ.get('{}_PATH'.format(NAME.upper())) != None:
 	CODE_PATH = os.environ['{}_PATH'.format(NAME.upper())]
+if os.environ.get('{}PATH'.format(NAME.upper())) != None and CODE_PATH == '':
+	CODE_PATH = os.environ['{}PATH'.format(NAME.upper())]
 # get from PYTHONPATH
 if os.environ.get('PYTHONPATH') != None and CODE_PATH == '':
 	path = os.environ['PYTHONPATH']
@@ -74,12 +76,12 @@ if CODE_PATH == '':
 	CODE_PATH = './'
 
 # RESOURCE DATA
-FLUXCALFOLDER = CODE_PATH+'/kastredux/resources/flux_standards/'
+FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
 FLUXCALS = {
 	'FEIGE110': {'FILE' : 'ffeige110.dat'},
 	'HILTNER600': {'FILE' : 'fhilt600.dat'},
 }
-SPTSTDFOLDER = CODE_PATH+'/kastredux/resources/spectral_standards/'
+SPTSTDFOLDER = CODE_PATH+'/resources/spectral_standards/'
 SPTSTDS = {}
 PLOT_DEFAULTS = {'figsize': [6,4], 'fontsize': 16,
 'color': 'k', 'ls': '-', 'alpha': 1, 
@@ -2586,8 +2588,11 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 				bck_wnd = redux['PARAMETERS']['SOURCE'][src]['BACK']
 			if 'CENTER' in list(redux['PARAMETERS']['SOURCE'][src].keys()): 
 				cntr = int(redux['PARAMETERS']['SOURCE'][src]['CENTER'])
-			else: cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
-			tcorr,tdisp = False,False
+				print('using input center {}'.format(cntr))
+			else: 
+				cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
+				print('found new center {}'.format(cntr))
+			tcorr,ttrace = False,False
 			if 'TELLURIC' in list(redux['PARAMETERS']['SOURCE'][src].keys()): 
 				tcorr,ttrace = True,True
 				tstar = redux['PARAMETERS']['SOURCE'][src]['TELLURIC']
@@ -2611,8 +2616,8 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			maskrect = rectify(redux['MASK'],trace)
 # recenter?
 			if cflag == True or cntr<0: 
-				cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
-				if verbose==True: print('Centered source to {}'.format(cntr))
+				cntr = findPeak(imrect,cntr=cntr,window=src_wnd,plot_file='{}/diagnostic_profile_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
+				if verbose==True: print('Recentered source to {}'.format(cntr))
 # choose profile and extract
 			if pflag.upper()=='SOURCE': 
 				if verbose==True: print('Using spatial profile measured from source')
@@ -2621,15 +2626,15 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 				if verbose==True: print('Using spatial profile measured from telluric standard {}'.format(tstar))
 				profile = redux['CAL_TELL'][tstar]['PROFILE']
 			else: 
-				profile = numpy.ones(int(2*src_wnd+1))
 				if verbose==True: print('Using flat spatial profile')
+				profile = numpy.ones(int(2*src_wnd+1))
 			spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,cntr=cntr,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
 			spflx.name = src
 			spflx.header = hd
 # reapply arc solution
 			arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 			arcrect = rectify(arcdp,trace)
-			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
+			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
 			spflx.applyWaveCal(arcrecal)
 # apply flux calibration
 			if 'CAL_FLUX' in list(redux.keys()): spflx.applyFluxCal(redux['CAL_FLUX'])
