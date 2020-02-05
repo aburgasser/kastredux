@@ -1032,7 +1032,7 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 		print(numpy.nanmedian(uncplot))
 		xlim = kwargs.get('xlim',[numpy.nanmin(sp1.wave.value),numpy.nanmax(sp1.wave.value)])
 		ylim = kwargs.get('ylim',[numpy.nanmin([0,numpy.quantile(f1,0.05)]),1.2*numpy.quantile(f1,0.95)])
-		f,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
+		fig,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
 		ax1.plot(wave,f1,c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
 		ax1.plot(wave,f2*scale_factor,c=kwargs.get('color',PLOT_DEFAULTS['comparison_color']),ls=kwargs.get('ls',PLOT_DEFAULTS['comparison_ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['comparison_alpha']))
 		ax1.legend(kwargs.get('legend',[sp1.name,sp2.name]),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
@@ -1057,7 +1057,7 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 #		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 #		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
-		if plot_file!='': fig.figure.savefig(plot_file)
+		if plot_file!='': fig.savefig(plot_file)
 
 	return stat, scale_factor
 
@@ -1092,7 +1092,7 @@ def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwa
 #
 		xlim = kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)])
 		ylim = kwargs.get('ylim',[-2.*numpy.nanquantile(u1,0.95),numpy.nanquantile(f1,0.95)])
-		f,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
+		fig,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
 		ax1.plot(wave,f1,c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
 		ax1.plot(wave,f2*scale_factor,c=kwargs.get('color',PLOT_DEFAULTS['comparison_color']),ls=kwargs.get('ls',PLOT_DEFAULTS['comparison_ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['comparison_alpha']))
 		ax1.legend(kwargs.get('legend',[sp1.name,sp2.name]),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
@@ -1118,7 +1118,7 @@ def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwa
 #		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 #		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
-		if plot_file!='': fig.figure.savefig(plot_file)
+		if plot_file!='': fig.savefig(plot_file)
 	return stat,scale_factor
 
 
