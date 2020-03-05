@@ -37,19 +37,14 @@ if sys.version_info.major != 2 and sys.version_info.major != 3:
 if sys.version_info.major == 2:	 # switch for those using python 3
 	import string
 
+
+############################################################
+# PROGRAM PACKAGE KEYWORDS
+############################################################
+
 NAME = 'kastredux'
-VERSION = '2020.01.16'
+VERSION = '2020.02.17'
 __version__ = VERSION
-DEFAULT_WAVE_UNIT = u.Angstrom
-DEFAULT_FLUX_UNIT = u.erg/u.cm/u.cm/u.Angstrom/u.s
-MODES = {
-	'RED': {'PREFIX': 'r', 'ALTNAME': ['r','rd','long','ir','nir'], 'NAME': 'KAST red'},
-	'BLUE': {'PREFIX': 'b', 'ALTNAME': ['b','bl','short','uv','vis'], 'NAME': 'KAST blue'},
-}
-DISPERSIONS = {
-	'600/7500': {'RESOLUTION': 1.3, 'TILT_COEFF': [2.23,-4687], 'LAM0': 7032.41},
-}
-CCD_PARAMETERS = {'GAIN': 0.55, 'RN': 4.3}
 
 #set the CODE_PATH, either from set environment variable or from PYTHONPATH or from sys.path
 CODE_PATH = ''
@@ -74,6 +69,132 @@ if CODE_PATH == '':
 if CODE_PATH == '':
 	print('Warning: could not set CODE_PATH variable from PYTHONPATH or system PATH environmental variables; some functionality may not work')
 	CODE_PATH = './'
+
+
+############################################################
+# KAST INSTRUMENT CONSTANTS AND FUNCTIONS
+############################################################
+
+DEFAULT_WAVE_UNIT = u.Angstrom
+DEFAULT_FLUX_UNIT = u.erg/u.cm/u.cm/u.Angstrom/u.s
+
+MODES = {
+	'RED': {'PREFIX': 'r', 'ALTNAME': ['r','rd','long','ir','nir'], 'NAME': 'KAST red', 'VERSION': 'kastr'},
+	'BLUE': {'PREFIX': 'b', 'ALTNAME': ['b','bl','short','uv','vis'], 'NAME': 'KAST blue', 'VERSION': 'kastb'},
+}
+DISPERSIONS = {
+	'452/3306': {'MODE': 'BLUE', 'RESOLUTION': 1.41, 'LAM0': 5460.74},
+	'600/3000': {'MODE': 'RED', 'RESOLUTION': 1.29, 'LAM0': 5460.74},
+	'600/4310': {'MODE': 'BLUE', 'RESOLUTION': 1.02, 'LAM0': 4358.33},
+	'830/3460': {'MODE': 'BLUE', 'RESOLUTION': 0.63, 'LAM0': 5460.74},
+	'1200/5000': {'MODE': 'RED', 'RESOLUTION': 0.65, 'LAM0': 5460.74},
+	'600/5000': {'MODE': 'RED', 'RESOLUTION': 1.3,  'LAM0': 7032.41},
+	'600/7500': {'MODE': 'RED', 'RESOLUTION': 1.3, 'LAM0': 7032.41},
+	'830/8460': {'MODE': 'RED', 'RESOLUTION': 0.94, 'LAM0': 7032.41},
+	'300/4230': {'MODE': 'RED', 'RESOLUTION': 2.53, 'LAM0': 7032.41},
+	'300/7500': {'MODE': 'RED', 'RESOLUTION': 2.53, 'LAM0': 7032.41},
+}
+# assumes slow read
+CCD_HEADER_KEYWORDS = {
+	'MODE': 'VERSION', # kastr = red, kastb = blue
+	'GRISM': 'GRISM_N',
+	'BLUE_DISPERSION': 'GRISM_N',
+	'GRATING': 'GRATNG_N',
+	'RED_DISPERSION': 'GRATNG_N',
+	'SLIT': 'SLIT_N',
+	'AIRMASS': 'AIRMASS',
+	'RA': 'RA',
+	'DEC': 'DEC',
+	'OBJECT': 'OBJECT',
+	'DATE-OBS': 'DATE-OBS',
+	'EXPTIME': 'EXPTIME',
+}
+CCD_PARAMETERS = {
+	'RED-FAST': {'GAIN': 0.55, 'RN': 4.3},
+	'RED-SLOW': {'GAIN': 1.9, 'RN': 3.7},
+	'BLUE-FAST': {'GAIN': 1.3, 'RN': 6.5},
+	'BLUE-SLOW': {'GAIN': 1.2, 'RN': 3.8},
+}
+
+# extract image mode from image header
+def kastRBMode(hdr,keyword='VERSION'):
+	if keyword not in list(hdr.keys()):
+		raise ValueError('Header does not contain red/blue mode keyword {}'.format(keyword))
+	md = hdr[keyword].strip()
+	mode = ''
+	for r in list(MODES.keys()):
+		if MODES[r]['VERSION'] == md: mode=r
+	if mode=='': raise ValueError('Could not identify spectral image mode from keyword {}'.format(keyword))
+	return mode
+
+# extract read mode from image header
+def kastReadMode(hdr,keyword_mode='VERSION',keyword_read='READ-SPD'):
+# get mode
+	mode = kastRBMode(hdr,keyword=keyword_mode)
+
+# get read mode
+	if keyword_read not in list(hdr.keys()):
+		raise ValueError('Header does not contain read speed keyword {}'.format(keyword_read))
+	rd = float(hdr[keyword_read])
+	rdspd = ''
+	if mode=='RED':
+		if rd==20.: rdspd='FAST'
+		elif rd==40.: rdspd='SLOW'
+		else: raise ValueError('Read speed {} does not conform to a standard read speed for mode {}'.format(rd,mode))
+	elif mode=='BLUE':
+		if rd==40.: rdspd='FAST'
+		elif rd==80.: rdspd='SLOW'
+		else: raise ValueError('Read speed {} does not conform to a standard read speed for mode {}'.format(rd,mode))
+	else:
+		raise ValueError('Do not recognize mode {}'.format(mode))
+	return rdspd
+
+# extract gain from image header
+def kastGain(hdr,keyword_mode='VERSION',keyword_read='READ-SPD'):
+# get R/B mode
+	mode = kastRBMode(hdr,keyword=keyword_mode)
+# get read mode
+	rdmode = kastReadMode(hdr,keyword_mode=keyword_mode,keyword_read=keyword_read)
+	index = '{}-{}'.format(mode,rdmode)
+	if index not in list(CCD_PARAMETERS.keys()):
+		raise ValueError('Do not know how to interpret mode {} and read mode {}'.format(mode,rdmode))
+	else:
+		return CCD_PARAMETERS[index]['GAIN']
+
+# extract read noise from image header
+def kastRN(hdr,keyword_mode='VERSION',keyword_read='READ-SPD'):
+# get R/B mode
+	mode = kastRBMode(hdr,keyword=keyword_mode)
+# get read mode
+	rdmode = kastReadMode(hdr,keyword_mode=keyword_mode,keyword_read=keyword_read)
+	index = '{}-{}'.format(mode,rdmode)
+	if index not in list(CCD_PARAMETERS.keys()):
+		raise ValueError('Do not know how to interpret mode {} and read mode {}'.format(mode,rdmode))
+	else:
+		return CCD_PARAMETERS[index]['RN']
+
+# extract read noise from image header
+def kastDispersion(hdr,keyword_mode='VERSION',keyword_blue_dispersion='GRISM_N',keyword_red_dispersion='GRATNG_N'):
+# get R/B mode
+	mode = kastRBMode(hdr,keyword=keyword_mode)
+# get key
+	if mode=='RED': key = keyword_red_dispersion
+	elif mode=='BLUE': key = keyword_blue_dispersion
+	else: 
+		raise ValueError('Do not know how to interpret dispersion mode {}'.format(mode))
+# get header
+	return kastHeaderValue(hdr,key)
+
+# extract header parameter using look-up table as backup
+def kastHeaderValue(hdr,keyword):
+	if keyword in list(hdr.keys()): return hdr[keyword]
+	elif keyword.upper() in list(hdr.keys()): return hdr[keyword.upper()]
+	elif keyword in list(CCD_HEADER_KEYWORDS.keys()): return hdr[CCD_HEADER_KEYWORDS[keyword]]
+	elif keyword.upper() in list(CCD_HEADER_KEYWORDS.keys()): return hdr[CCD_HEADER_KEYWORDS[keyword.upper()]]
+	else:
+		raise ValueError('Cannot find keyword {} in header or header lookup table'.format(keyword))
+
+
 
 # RESOURCE DATA
 FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
@@ -549,7 +670,7 @@ class Spectrum(object):
 #		fig.show()
 		return fig
 
-	def toFile(self,file,clobber=True,csv=False,delimiter='\t',save_header=True,save_noise=False,save_background=False,save_mask=False,comment='#',**kwargs):
+	def toFile(self,file,overwrite=True,csv=False,delimiter='\t',save_header=True,save_noise=False,save_background=False,save_mask=False,comment='#',**kwargs):
 		'''
 		Exports a spectrum to a file
 		'''
@@ -575,7 +696,7 @@ class Spectrum(object):
 			for k in list(self.__dict__.keys()):
 				if isinstance(getattr(self,k),str) == True or isinstance(getattr(self,k),int) == True or isinstance(getattr(self,k),bool) == True or (isinstance(getattr(self,k),float) == True and numpy.isnan(getattr(self,k)) == False):
 					hdu.header[k.upper()] = str(getattr(self,k))
-			hdu.writeto(file,overwrite=clobber)
+			hdu.writeto(file,overwrite=overwrite)
 
 # ascii file - by default tab delimited
 		else:
@@ -873,6 +994,7 @@ def typeToNum(input, prefix='',suffix='',verbose=ERROR_CHECKING):
 		return inp
 
 
+
 ############################################################
 # SPECTRUM MANIPULATION FUNCTIONS
 # These functions are used in conjunctino with Spectrum structure
@@ -976,177 +1098,16 @@ def readSpectrum(filename,file_type='',delimiter='\s+',comment='#',columns=['wav
 	return sp
 
 
-def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
-	'''
-	Compares to spectra to each other and returns the best fit statistic and scale factor
-	Input: spectra objects
-	Output: fit stat and scale factor 
-	'''
-# make sure both spectra conform to same wave and flux units
-	sp2 = copy.deepcopy(sp2orig)
-	try:
-		sp2.convertWave(sp1.wave.unit)
-	except:
-		raise ValueError('Cannot convert second spectrum with wave units {} to wave units {}'.format(sp2.wave.unit,sp1.wave.unit))
-	try:
-		sp2.convertFlux(sp1.flux.unit)
-	except:
-		raise ValueError('Cannot convert second spectrum with flux units {} to flux units {}'.format(sp2.flux.unit,sp1.flux.unit))
-
-# interpolate onto a common wavelength scale
-	wave = sp1.wave.value
-	f1 = sp1.flux.value
-	u1 = sp1.unc.value
-	f2interp = interp1d(sp2.wave.value,sp2.flux.value,bounds_error=False,fill_value=0.)
-	u2interp = interp1d(sp2.wave.value,sp2.unc.value,bounds_error=False,fill_value=0.)
-	f2 = f2interp(wave)
-	u2 = u2interp(wave)
-
-# check uncertainties
-	if numpy.isnan(numpy.median(u1))==True and numpy.isnan(numpy.median(u2))==False: vtot = u2**2
-	elif numpy.isnan(numpy.median(u1))==False and numpy.isnan(numpy.median(u2))==True: vtot = u1**2
-	elif numpy.isnan(numpy.median(u1))==True and numpy.isnan(numpy.median(u2))==True: vtot=numpy.ones(len(wave))
-	else: vtot = u1**2+u2**2
-
-# fit range
-	weights = numpy.ones(len(wave))
-	if len(fit_range)>1:
-		weights[wave<numpy.nanmin(fit_range)]=0
-		weights[wave>numpy.nanmax(fit_range)]=0
-
-# using just chi2 for now
-	scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*(f2**2)/vtot)
-	stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
-
-# add in a little iteration
-	if fitcycle>1:
-		for i in range(fitcycle):
-			wdiff = numpy.absolute(weights*(f1-f2*scale_factor)**2/vtot)
-			weights[wdiff>sclip]==0
-			scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*(f2**2)/vtot)
-			stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
-
-	if plot==True or plot_file!='':
-		uncplot = vtot**0.5
-		if numpy.isnan(numpy.median(u1))==True and numpy.isnan(numpy.median(u2))==True: uncplot = numpy.zeros(len(wave))
-		print(numpy.nanmedian(uncplot))
-		xlim = kwargs.get('xlim',[numpy.nanmin(sp1.wave.value),numpy.nanmax(sp1.wave.value)])
-		ylim = kwargs.get('ylim',[numpy.nanmin([0,numpy.quantile(f1,0.05)]),1.2*numpy.quantile(f1,0.95)])
-		fig,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
-		ax1.plot(wave,f1,c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
-		ax1.plot(wave,f2*scale_factor,c=kwargs.get('color',PLOT_DEFAULTS['comparison_color']),ls=kwargs.get('ls',PLOT_DEFAULTS['comparison_ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['comparison_alpha']))
-		ax1.legend(kwargs.get('legend',[sp1.name,sp2.name]),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		ax1.plot(wave,uncplot**0.5,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
-		ax1.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
-		ax1.fill_between(wave,numpy.zeros(len(wave))+ylim[0],(1-weights)*ylim[1],facecolor='grey',alpha=0.2)
-#		ax1.set_xlim(kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)]))
-		ax1.set_ylim(ylim)
-		ax1.set_ylabel(kwargs.get('ylabel',r'Flux ({})'.format(sp1.flux.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-#		ax1.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-#		ax1.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		diff = f1-f2*scale_factor
-		ylim2 = kwargs.get('ylim2',[-3.*numpy.nanstd(diff),3.*numpy.nanstd(diff)])
-		ax2.plot(wave,diff,c=kwargs.get('background_color',PLOT_DEFAULTS['background_color']),ls=kwargs.get('background_ls',PLOT_DEFAULTS['background_ls']),alpha=kwargs.get('background_alpha',PLOT_DEFAULTS['background_alpha']))
-		ax2.plot(wave[weights==1],diff[weights==1],c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
-		ax2.fill_between(wave,uncplot,-1.*uncplot,facecolor=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),linestyle=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
-#		ax2.plot(wave,-1.*sp.unc.value,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
-		ax2.set_xlabel(kwargs.get('xlabel',r'Wavelength ({})'.format(sp1.wave.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		ax2.set_ylabel(kwargs.get('ylabel','O-C'),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		ax2.set_xlim(xlim)
-		ax2.set_ylim(ylim2)
-#		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-#		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
-		if plot_file!='': fig.savefig(plot_file)
-
-	return stat, scale_factor
-
-def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwargs):
-	'''
-	A very stripped down version of compareSpectra() to address errors 
-	'''
-	sp2 = copy.deepcopy(sp2orig)
-	sp2.convertWave(sp1.wave.unit)
-	sp2.convertFlux(sp1.flux.unit)
-	wave = sp1.wave.value
-	f1 = sp1.flux.value
-	u1 = sp1.unc.value
-	f2interp = interp1d(sp2.wave.value,sp2.flux.value,bounds_error=False,fill_value=0.)
-	f2 = f2interp(wave)
-	vtot = u1**2
-	weights = numpy.ones(len(wave))
-	if len(fit_range)>1:
-		weights[wave<numpy.nanmin(fit_range)]=0
-		weights[wave>numpy.nanmax(fit_range)]=0
-	scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*f2*f2/vtot)
-	stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
-	if plot==True: 
-		# plt.clf()
-		# plt.figure(figsize=[8,4])
-		# plt.plot(wave,f2*scale_factor,'r-')
-		# plt.plot(wave,f1,'k-')
-		# plt.plot(wave,f1-f2*scale_factor,'k--')
-		# plt.fill_between(wave,-1.*u1,u1,color='k',alpha=0.1)
-		# plt.xlim([numpy.nanmin(wave),numpy.nanmax(wave)])
-		# plt.ylim([-3.*numpy.nanquantile(u1,0.95),numpy.nanquantile(f1,0.95)])
-#
-		xlim = kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)])
-		ylim = kwargs.get('ylim',[-2.*numpy.nanquantile(u1,0.95),numpy.nanquantile(f1,0.95)])
-		fig,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
-		ax1.plot(wave,f1,c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
-		ax1.plot(wave,f2*scale_factor,c=kwargs.get('color',PLOT_DEFAULTS['comparison_color']),ls=kwargs.get('ls',PLOT_DEFAULTS['comparison_ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['comparison_alpha']))
-		ax1.legend(kwargs.get('legend',[sp1.name,sp2.name]),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		ax1.plot(wave,u1,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
-		ax1.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
-		ax1.fill_between(wave,-1.*u1,u1,facecolor='k',alpha=0.1)
-#		ax1.set_xlim(kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)]))
-		ax1.set_xlim(xlim)
-		ax1.set_ylim(ylim)
-		ax1.set_ylabel(kwargs.get('ylabel',r'Flux ({})'.format(sp1.flux.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-#		ax1.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-#		ax1.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		diff = f1-f2*scale_factor
-		ylim2 = kwargs.get('ylim2',[-3.*numpy.nanstd(diff),3.*numpy.nanstd(diff)])
-		ax2.plot(wave,diff,c=kwargs.get('background_color',PLOT_DEFAULTS['background_color']),ls=kwargs.get('background_ls',PLOT_DEFAULTS['background_ls']),alpha=kwargs.get('background_alpha',PLOT_DEFAULTS['background_alpha']))
-		ax2.plot(wave[weights==1],diff[weights==1],c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
-		ax2.fill_between(wave,u1,-1.*u1,facecolor=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),linestyle=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
-#		ax2.plot(wave,-1.*sp.unc.value,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
-		ax2.set_xlabel(kwargs.get('xlabel',r'Wavelength ({})'.format(sp1.wave.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		ax2.set_ylabel(kwargs.get('ylabel','O-C'),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		ax2.set_xlim(xlim)
-		ax2.set_ylim(ylim2)
-#		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-#		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
-		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
-		if plot_file!='': fig.savefig(plot_file)
-	return stat,scale_factor
-
-
-
-def combineSpectra():
-	'''
-	Combines spectra together
-	Input: spectra objects
-	Output: combined spectrum object 
-	'''
-	pass
-
-def stitchOrders():
-	'''
-	Stitches together multiple orders into one spectrum
-	Input: spectra objects
-	Output: combined spectrum object 
-	'''
-	pass
-
 
 ############################################################
 # KAST IMAGE DATA FUNCTIONS
 # These functions allow for I/O with KAST data files, and image manipulation
 ############################################################
 
+
+
 # program to generate a log sheet
-def makeLog(folder,output='',verbose=ERROR_CHECKING):
+def makeLog(folder,output='',mode='RED',verbose=ERROR_CHECKING):
 	'''
 	:Purpose:
 
@@ -1210,7 +1171,7 @@ def makeLog(folder,output='',verbose=ERROR_CHECKING):
 	return dp
 		
 
-def readKastFiles(num,folder='./',mode='RED',verbose=ERROR_CHECKING):
+def readKastFiles(num,folder='./',mode='',prefix='',rotate=True,verbose=ERROR_CHECKING):
 	'''
 	:Purpose:
 
@@ -1241,28 +1202,40 @@ def readKastFiles(num,folder='./',mode='RED',verbose=ERROR_CHECKING):
 # generate list of files depending on input format	
 	nlist = copy.deepcopy(num)
 	if not isinstance(nlist,list): nlist = [num]
+	files = []
+# files provided	
 	if isinstance(nlist[0],str): 
 		if os.path.exists(nlist[0]): files = nlist
-		else: 
+		elif os.path.exists('{}/{}'.format(folder,nlist[0])): files = ['{}/{}'.format(folder,n) for n in nlist]
+# file numbers syntax provided - need mode or prefix as input
+		else:
+			try:
+				nlist = numberList(nlist[0])
+			except: 
+				raise ValueError('Could not located data files from input {}'.format(num))
+	if len(files) == 0:
+		if prefix=='': 
+			if mode=='': raise ValueError('Mode (red/blue) or file prefix must be provided')
 			if checkDict(mode,MODES) == False: raise ValueError('Mode {} not defined'.format(mode))
 			else: mode=checkDict(mode,MODES)	
-			nlist = numberList(nlist[0])
-			files = ['{}/{}{}.fits'.format(folder,MODES[mode]['PREFIX'],str(n).zfill(4)) for n in nlist]
-	else: 
-		if checkDict(mode,MODES) == False: raise ValueError('Mode {} not defined'.format(mode))
-		else: mode=checkDict(mode,MODES)	
-		files = ['{}/{}{}.fits'.format(folder,MODES[mode]['PREFIX'],str(n).zfill(4)) for n in nlist]
+			prefix=MODES[mode]['PREFIX']
+		files = ['{}/{}{}.fits'.format(folder,prefix,str(n).zfill(4)) for n in nlist]
+# read in files
 	for f in files:
 		if not os.path.exists(f): print('Warning: cannot find data file {}; skipping'.format(f))
 		else:
 			hdulist = fits.open(f)
 			im = hdulist[0].data
-			if mode=='RED': im = numpy.rot90(im,k=1)
+			hdr = hdulist[0].header
+			hdulist.close()
+			if mode=='':
+				try: mode = kastRBMode(hdr)
+				except: mode='UNKNOWN'
+			if mode=='RED' and rotate==True: im = numpy.rot90(im,k=1)
 # subtract overscan: TBD
 #	ims = subtractOverscan(im)
 			images.append(im.astype(float))
-			hds.append(hdulist[0].header)
-			hdulist.close()
+			hds.append(hdr)
 	if len(files) == 1: return images[0],hds[0]
 	else: return images,hds
 
@@ -1327,6 +1300,8 @@ def combineImages(imarr,method='median',axis=0,sclip=5.,verbose=ERROR_CHECKING,*
 				output[i,j] = f(sl[numpy.absolute(sl-output[i,j])<sclip*std[i,j]])
 	return output
 
+
+# combine images with cosmic ray rejection
 def crRejectCombine(ims,sclip=1.,nfitcycle=5,rejlimit=0.01,scliplimit=10.,smooth=False,smooth_scale=3,verbose=ERROR_CHECKING):
 	msks = []
 	for i in range(len(ims)):
@@ -1359,6 +1334,8 @@ def crRejectCombine(ims,sclip=1.,nfitcycle=5,rejlimit=0.01,scliplimit=10.,smooth
 	imcc[mskc==len(ims)] = numpy.nanmedian(imcc)
 	return imcc
 
+
+# clean images using a mask
 def maskClean(image,mask,replace=0.,verbose=ERROR_CHECKING):
 	'''
 	:Purpose:
@@ -1487,7 +1464,7 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 				dt = {}				
 				for p in parts[1:]:
 					kv = p.split('=')
-					dt[kv[0].upper().strip()] = kv[1].upper().strip()
+					if len(kv)>1: dt[kv[0].upper().strip()] = kv[1].upper().strip()
 				if 'NAME' not in list(dt.keys()): raise ValueError('information list for {} requires NAME keyword; current lists gives {}'.format(ref,dt))
 				if 'FILES' not in list(dt.keys()): raise ValueError('information list for {} requires FILES keyword; current lists gives {}'.format(ref,dt))
 				dt['FILES'] = numberList(dt['FILES'])
@@ -1510,7 +1487,7 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 
 
 
-def makeBias(files,method='median',folder='./',mode='RED',verbose=ERROR_CHECKING,output=''):
+def makeBias(files,method='median',folder='./',mode='',prefix='',overwrite=True,verbose=ERROR_CHECKING,output=''):
 	'''
 	:Purpose:
 
@@ -1535,25 +1512,25 @@ def makeBias(files,method='median',folder='./',mode='RED',verbose=ERROR_CHECKING
 		Note: currently this is only a pass through to ``combineImages()''; could include additional checks
 
 	'''
-	images,hds = readKastFiles(files,folder=folder,mode=mode)
+	images,hds = readKastFiles(files,folder=folder,mode=mode,prefix=prefix)
 	if len(numpy.shape(images))==2:
 		if verbose==True: print('Warning: image array is just a single image of dimensions {}; returning'.format(numpy.shape(images)))
 		return images,hds
 
 	im = combineImages(images,method=method)
 
-	if output != '':
-		if verbose==True: print('Writing bias frame to {}'.format(output))
-		try:
-			hdu = fits.PrimaryHDU(data=im)
-			hdu.writeto(output,overwrite=True)
-		except:
-			print('Warning: could not write to file {}'.format(output))
+	if output == '': output='bias_{}.fits'.format(mode)
+	if verbose==True: print('Writing bias frame to {}'.format(output))
+	try:
+		hdu = fits.PrimaryHDU(data=im,header=hds[0])
+		hdu.writeto(output,overwrite=overwrite)
+	except:
+		print('Warning: could not write to file {}'.format(output))
 
 	return im,hds[0]
 
 
-def makeFlat(files,bias,method='median',quantile=0.9,folder='./',mode='RED',verbose=ERROR_CHECKING,output=''):
+def makeFlat(files,bias,method='median',quantile=0.9,folder='./',mode='',prefix='',verbose=ERROR_CHECKING,overwrite=True,output=''):
 	'''
 	:Purpose:
 
@@ -1580,32 +1557,55 @@ def makeFlat(files,bias,method='median',quantile=0.9,folder='./',mode='RED',verb
 		TBD
 
 	'''
-	images,hds = readKastFiles(files,folder=folder,mode=mode)
+	images,hds = readKastFiles(files,folder=folder,mode=mode,prefix=prefix)
 	if len(numpy.shape(images))==2:
 		if verbose==True: print('Warning: image array is just a single image of dimensions {}; returning'.format(numpy.shape(images)))
 		return images,hds
+
+# read in bias if necessary
+	if isinstance(bias,str): 
+		if os.path.exists(bias): bias,bhd = readKastFiles(bias)
+		elif os.path.exists(folder+'/'+bias): bias,bhd = readKastFiles(folder+'/'+bias)
+		else: raise ValueError('Cannot find bias file {}'.format(bias))
+		if kastRBMode(bhd) != kastRBMode(hds[0]): raise ValueError('Red/blue mode of bias frame is {} while that of flat field frames is {}'.format(kastRBMode(bhd),kastRBMode(hds[0])))
 
 	images = [f-bias for f in images]
 	flat = combineImages(images,method=method)
 	im = flat/numpy.quantile(flat,0.9)
 
-	if output != '':
-		if verbose==True: print('Writing flat field frame to {}'.format(output))
-		try:
-			hdu = fits.PrimaryHDU(data=im)
-			hdu.writeto(output,overwrite=True)
-		except:
-			print('Warning: could not write to file {}'.format(output))
+	if output == '': output='flat_{}.fits'.format(mode)
+	if verbose==True: print('Writing flat field frame to {}'.format(output))
+	try:
+		hdu = fits.PrimaryHDU(data=im,header=hds[0])
+		hdu.writeto(output,overwrite=overwrite)
+	except:
+		print('Warning: could not write to file {}'.format(output))
 
 	return im,hds[0]
 
 
-def makeMask(bias,flat,sclip=3.,verbose=ERROR_CHECKING,output=''):
+def makeMask(bias,flat,sclip=3.,mode='',verbose=ERROR_CHECKING,overwrite=True,output=''):
 	'''
 	Creates a mask file: 0 = OK, 1 = BAD
 	Input: flat, bias
 	Output: mask image
 	'''
+
+# read in bias and flat if necessary
+	if isinstance(bias,str): 
+		if os.path.exists(bias): bias,bhd = readKastFiles(bias)
+		elif os.path.exists(folder+'/'+bias): bias,bhd = readKastFiles(folder+'/'+bias)
+		else: raise ValueError('Cannot find bias file {}'.format(bias))
+		if mode=='': mode = kastRBMode(bhd)
+	if isinstance(flat,str): 
+		if os.path.exists(flat): flat,fhd = readKastFiles(flat)
+		elif os.path.exists(folder+'/'+flat): flat,fhd = readKastFiles(folder+'/'+flat)
+		else: raise ValueError('Cannot find flat file {}'.format(flat))
+		if mode=='': mode = kastRBMode(fhd)
+	if mode=='': 
+		print('Warning: no red/blue mode provided for mask, so unclear which setting this is for')
+		mode = 'UNKNOWN'
+
 	mask = copy.deepcopy(bias)*0
 # remove negative values	
 	mask[flat<0.] = 1
@@ -1624,23 +1624,27 @@ def makeMask(bias,flat,sclip=3.,verbose=ERROR_CHECKING,output=''):
 	mask[numpy.absolute(bias-numpy.nanmedian(bias[mask==0]))>sclip*numpy.nanstd(bias[mask==0])] = 1
 #	mask[redux['BIAS']>(5.*numpy.nanstd(redux['BIAS'])+numpy.nanmedian(redux['BIAS']))] = 1
 
-	if output != '':
-		if verbose==True: print('Writing mask frame to {}'.format(output))
-		try:
-			hdu = fits.PrimaryHDU(data=mask)
-			hdu.writeto(output,overwrite=True)
-		except:
-			print('Warning: could not write to file {}'.format(output))
+	if output == '': output='mask_{}.fits'.format(mode)
+	if verbose==True: print('Writing mask frame to {}'.format(output))
+	try:
+		hdu = fits.PrimaryHDU(data=mask)
+		hdu.writeto(output,overwrite=overwrite)
+	except:
+		print('Warning: could not write to file {}'.format(output))
 
 	return mask
 
-def reduceScienceImage(image, bias, flat, mask=[], exposure='EXPTIME', gain=CCD_PARAMETERS['GAIN'], rn=CCD_PARAMETERS['RN'], mask_image=True, folder='./',mode='RED',verbose=ERROR_CHECKING):
+
+def reduceScienceImage(image, bias, flat, mask=[], hd={}, mode='', rdmode='', gain=0., rn=0., exposure='EXPTIME', mask_image=True, folder='./', verbose=ERROR_CHECKING):
 	'''
 	:Purpose:
 
-		Performs image reduction steps on a science image: 
-		bias subtraction, flat fielding, masking bad pixels, and conversion to e-/s; 
-		and computes variance image
+		Performs the following image reduction steps on a science image: 
+		* subtracts bias
+		* converts to e/s
+		* computes variance
+		* divides by normalized flat field
+		* masks bad pixels
 
 	:Required Inputs: 
 
@@ -1653,8 +1657,6 @@ def reduceScienceImage(image, bias, flat, mask=[], exposure='EXPTIME', gain=CCD_
 		:param mask=None: set to a 2D mask image if masking is desired
 		:param mask_image=True: set to True to mask clean a science image
 		:param exposure='EXPTIME': either the header keyword for exposure time or exposure in seconds
-		:param gain=CCD_PARAMETERS['GAIN']: either the header keyword for gain (DN/e-) or the gain value
-		:param gain=CCD_PARAMETERS['RN']: either the header keyword for read noise (in e-) or the read noise value
 		:param folder='./': data folder containing data
 		:param mode='RED': data mode (RED or BLUE)
 
@@ -1667,39 +1669,52 @@ def reduceScienceImage(image, bias, flat, mask=[], exposure='EXPTIME', gain=CCD_
 		TBD
 
 	'''
-	'''
-	Performs reduction steps on science image:
-		* rotates and trims image
-		* subtracts overscan
-		* subtracts bias
-		* converts to e/s
-		* computes variance
-		* divides by normalized flat field
-		* masks bad pixels
-	Inputs: raw science image, bias, flat, mask
-	Outputs: processed image, variance, & updated header
-	'''
 # read in image if necessary
-	im = copy.deepcopy(image)
-	if len(mask)==0: mask = image_e*0
+	im = copy.deepcopy(image)	
 	if isinstance(image,str) or isinstance(image,int): 
 		im,hd = readKastFiles(image,folder=folder,mode=mode)
-		if isinstance(exposure,str): 
-			if exposure not in list(hd.keys()): raise ValueError('Cannot find exposure keyword {} in science image header'.format(exposure))
-			exposure = float(hd[exposure])
-		if isinstance(gain,str): 
-			if gain not in list(hd.keys()): raise ValueError('Cannot find gain keyword {} in science image header'.format(gain))
-			gain = float(hd[gain])
-		if isinstance(rn,str): 
-			if rn not in list(hd.keys()): raise ValueError('Cannot find read noise keyword {} in science image header'.format(rn))
-			rn = float(hd[rn])
+# CCD keywords
+	if mode=='':
+		try: mode = kastRBMode(hd)
+		except: raise ValueError('Cannot determine red/blue mode of this image; be sure to pass this value or the original header')
+	if rdmode=='':
+		try: rdmode = kastReadMode(hd)
+		except: raise ValueError('Cannot determine read mode of this image; be sure to pass this value or the original header')
+	if gain==0.:
+		try: gain = kastGain(hd)
+		except: raise ValueError('Cannot determine gain of this image; be sure to pass this value or the original header')
+#		if verbose==True: print('Using gain of {:.1f}'.format(gain))
+	if rn==0.:
+		try: rn = kastRN(hd)
+		except: raise ValueError('Cannot determine read noise of this image; be sure to pass this value or the original header')
+#		if verbose==True: print('Using read noise of {:.1f}'.format(rn))
+	if isinstance(exposure,str):
+		expkey = copy.deepcopy(exposure) 
+		try: exposure = kastHeaderValue(hd,expkey)
+		except: raise ValueError('Could not identify exposure keyword {} in header; you may need to pass a numerical value or the original header'.format(exposure))
+	if exposure==0.:
+		raise ValueError('Module inferred exposure time of {}; try passing a different exposure keyword'.format(exposure))
+
+# read in bias and flat if necessary
+	if isinstance(bias,str): 
+		if os.path.exists(bias): bias,bhd = readKastFiles(bias)
+		elif os.path.exists(folder+'/'+bias): bias,bhd = readKastFiles(folder+'/'+bias)
+		else: raise ValueError('Cannot find bias file {}'.format(bias))
+		if kastRBMode(bhd) != kastRBMode(hd): raise ValueError('Red/blue mode of bias frame is {} while that of science frames is {}'.format(kastRBMode(bhd),kastRBMode(hd)))
+	if isinstance(flat,str): 
+		if os.path.exists(flat): flat,fhd = readKastFiles(flat)
+		elif os.path.exists(folder+'/'+flat): flat,fhd = readKastFiles(folder+'/'+flat)
+		else: raise ValueError('Cannot find flat file {}'.format(flat))
+		if kastRBMode(fhd) != kastRBMode(hd): raise ValueError('Red/blue mode of flat frame is {} while that of science frames is {}'.format(kastRBMode(bhd),kastRBMode(hd)))
+
 # process image
 	image_b = im-bias
 	image_e = image_b*gain
 # mask flat before dividing
+	if len(mask)==0: mask = image_e*0
 	fm = maskClean(flat,mask,replace=1.)
 	image_f = image_e/(fm*exposure)
-	variance = (image_e+rn**2)/((fm*exposure)**2)
+	variance = (image_e/fm+rn**2)/(exposure**2)
 # mask image
 	if mask_image==True:
 		image_f = maskClean(image_f,mask,replace=numpy.nanmedian(image_f))	
@@ -1869,6 +1884,8 @@ def spatialProfile(im,cntr=-1,window=10,verbose=ERROR_CHECKING,plot_file=''):
 		plt.close()
 	return profile
 
+
+
 def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wnd=5,bck_wnd=[10,20],subtract_background=True,verbose=ERROR_CHECKING,plot_file='',center_kwargs={},**kwargs):
 	'''
 	Purpose:
@@ -1968,9 +1985,9 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 		prf[msrc==1] = 0.
 # catch if we mask all pixels		
 		if numpy.nansum(prf)==0.: prf = copy.deepcopy(profile)
-# extract fluxes & uncertainties		
+# extract fluxes & uncertainties - not entirely sure about the variance calculation...
 		flx.append(numpy.nansum(src*prf)/numpy.nansum(prf))
-		unc.append((numpy.nansum(vsrc*prf)/numpy.nansum(prf))**0.5)
+		unc.append((numpy.nansum(vsrc*prf)**0.5)/numpy.nansum(prf))
 	flx = numpy.array(flx)
 	unc = numpy.array(unc)
 
@@ -2057,7 +2074,7 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 	return sp
 
 
-def waveCalibrateArcs(arcim,deep=[],dispersion='',trace=[],prior={},fitorder=4,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=0.,cntr=0.,fitcycle=5,sclip=2.,plot_file=''):
+def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fitorder=4,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=0.,cntr=0.,fitcycle=5,sclip=2.,plot_file=''):
 	'''
 	Wavelength calibration from arc lamp
 	Input: arc, list of lines
@@ -2073,21 +2090,32 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',trace=[],prior={},fitorder=4,v
 		raise ValueError('You must provide prior fit coefficients (prior={}), specify the dispersion (dispersion={}), or specify the resolution (resolution={}) and strongest line wavelength (lam0={})'.format(prior,dispersion,resolution,lam0))
 
 # strongest line in red - THIS WILL NEED TO BE CHANGED TO ALLOW BLUE EXTRACTIONS
-	extwidth = 30
-	swindow = 30
-	dwindow = 10
-	deep_threshold = 0.003
-# WE NEED SOME LINE IDS AROUND 7600-7650 A
-	hehgcd = numpy.array([4358.33,4471.50,4678.16,4799.92,5015.68,5085.82,5460.74,5769.59,5790.65,5875.62,\
-			6678.15,7065.19,8667.943,9122.97,9224.50,9354.22,9657.78,9784.50,10139.5])
-	near = numpy.array([5852.49,5881.19,5944.83,5975.28,6030.00,6074.34,6096.16,6143.06,6163.59,6217.28,\
-			6266.50,6304.79,6334.40,6382.99,6402.25,6506.53,6532.88,6598.95,6678.20,6717.04,6929.47,6965.43,\
-			7032.41,7173.94,7245.17,7383.98,7438.90,7635.105,7723.76,7948.175,8115.31,8264.52,8300.33,8377.61,8418.43,8424.65,8495.36,\
-#		  8581.26,8654.45,8667.943,
-			8780.6223,8865.7562,8919.5007,8988.58,9148.68,9300.85,9813.98,9373.28,9425.38,9459.21,9486.68,\
-			9534.17,9665.43])
-	alines = numpy.append(near,hehgcd)
-	strong = numpy.array([5944.83,6143.06,6402.25,6506.52,6678.2,6929.47,7032.41,7245.17,7438.90,7635.105,8115.31,8377.61,9122.9660])
+	if mode=='RED':
+		extwidth = 30
+		swindow = 30
+		dwindow = 15
+		deep_threshold = 0.003
+		hehgcd = numpy.array([4358.33,4471.50,4678.16,4799.92,5015.68,5085.82,5460.74,5769.59,5790.65,5875.62,\
+				6678.15,7065.19,8667.943,9122.97,9224.50,9354.22,9657.78,9784.50,10139.5])
+		near = numpy.array([5852.49,5881.19,5944.83,5975.28,6030.00,6074.34,6096.16,6143.06,6163.59,6217.28,\
+				6266.50,6304.79,6334.40,6382.99,6402.25,6506.53,6532.88,6598.95,6678.20,6717.04,6929.47,6965.43,\
+				7032.41,7173.94,7245.17,7383.98,7438.90,7635.105,7723.76,7948.175,8115.31,8264.52,8300.33,8377.61,8418.43,8424.65,8495.36,\
+	#		  8581.26,8654.45,8667.943,
+				8780.6223,8865.7562,8919.5007,8988.58,9148.68,9300.85,9813.98,9373.28,9425.38,9459.21,9486.68,\
+				9534.17,9665.43])
+		alines = numpy.append(near,hehgcd)
+		strong = numpy.array([5944.83,6143.06,6402.25,6506.52,6678.2,6929.47,7032.41,7245.17,7438.90,7635.105,8115.31,8377.61,8919.5007,8988.58,9122.9660])
+	elif mode=='BLUE':
+		extwidth = 30
+		swindow = 30
+		dwindow = 25
+		deep_threshold = 0.0015
+		hehgcd = numpy.array([3261.05,3341.08,3403.65,3466.55,3610.51,3650.15,3662.88,3888.65,4046.56,4077.83,\
+				4358.33,4471.50,4678.16,4799.92,4921.93,5015.68,5085.82,5460.74,5769.59,5790.65,5875.62])
+		alines = hehgcd
+		strong = numpy.array([3466.55,4046.56,4358.33,4678.16,4799.92,5085.82,5460.74,5875.62,5944.83])
+	else: raise ValueError('You must specify the red/blue mode (mode=RED or BLUE); mode={} was passed'.format(mode))
+
 	cal_wave = {}
 
 # extract arc traces from arc files
@@ -2119,7 +2147,8 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',trace=[],prior={},fitorder=4,v
 		p0 = [resolution,lam0-resolution*numpy.argmax(arctrace)]
 		wave0 = numpy.polyval(p0,numpy.arange(len(arctrace)))
 
-# now center the strongest features
+# now center the strongest feature
+# this could be done better using a cross-correlation method
 		lines_y = strong[strong<(numpy.nanmax(wave0)-0.1*(numpy.nanmax(wave0)-numpy.nanmin(wave0)))]
 		lines_y = lines_y[lines_y>(numpy.nanmin(wave0)+0.1*(numpy.nanmax(wave0)-numpy.nanmin(wave0)))]
 		lines_x = []
@@ -2127,21 +2156,26 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',trace=[],prior={},fitorder=4,v
 			x0 = numpy.argmin(numpy.absolute(wave0-n))
 			aslice = arctrace[(x0-swindow):(x0+swindow+1)]
 			lines_x.append(x0+numpy.argmax(aslice)-swindow+1)
-		p1 = numpy.polyfit(lines_x,lines_y,fitorder)
+#		print(dispersion,resolution,lam0,numpy.argmax(arctrace),numpy.nanmin(wave0),numpy.nanmax(wave0),lines_y,lines_x)
+		sfitorder = numpy.nanmin([len(lines_x)-1,fitorder])
+		p1 = numpy.polyfit(lines_x,lines_y,sfitorder)
 		wave1 = numpy.polyval(p1,numpy.arange(len(arctrace)))
 		rms = numpy.nanstd(lines_y-numpy.polyval(p1,lines_x))
-		if verbose==True: print('Strong line pass: RMS={:.3f} Ang at {:.2f} Ang for {} lines and fit order {}; dRV = {:.1f} km/s'.format(rms,numpy.nanmedian(wave1),len(lines_y),fitorder,3.e5*rms/numpy.nanmedian(wave1)))
+		if verbose==True: print('Strong line pass: RMS={:.3f} Ang at {:.2f} Ang for {} lines and fit order {}; dRV = {:.1f} km/s'.format(rms,numpy.nanmedian(wave1),len(lines_y),sfitorder,3.e5*rms/numpy.nanmedian(wave1)))
+
+	# plt.plot(wave1,arctrace)
+	# raise ValueError
 
 # now repeat for all of the lines 
 	all_select = alines[alines<(numpy.nanmax(wave1)-0.02*(numpy.nanmax(wave1)-numpy.nanmin(wave1)))]
 	all_select = all_select[all_select>(numpy.nanmin(wave1)+0.02*(numpy.nanmax(wave1)-numpy.nanmin(wave1)))]
 #	all_select = alines[alines<(numpy.nanmax(wave1))]
 #	all_select = all_select[all_select>(numpy.nanmin(wave1))]
-	lines_y,lines_x = [],[]
 # use deep exposure if you have it
 	atrace = arctrace
 	if len(deep)>0: atrace = arctrace_deep
 
+	lines_y,lines_x = [],[]
 	for n in all_select:
 		x0 = numpy.argmin(numpy.absolute(wave1-n))
 		aslice = atrace[(x0-dwindow):(x0+dwindow+1)]
@@ -2153,18 +2187,36 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',trace=[],prior={},fitorder=4,v
 	w = numpy.where(lines_x>0)
 # cycle through the fit	
 	for i in range(fitcycle):
-		p2 = numpy.polyfit(lines_x[w],lines_y[w],fitorder)
+		sfitorder = numpy.nanmin([len(lines_x[w])-1,fitorder])
+		p2 = numpy.polyfit(lines_x[w],lines_y[w],sfitorder)
 		diff = lines_y-numpy.polyval(p2,lines_x)
 		w = numpy.where(numpy.absolute(diff)<sclip*numpy.nanstd(diff[w]))
 		rms = numpy.nanstd(diff[w])
 		wave = numpy.polyval(p2,numpy.arange(len(atrace)))
-		if verbose==True: print('Deep line pass {}: RMS={:.3f} Ang for {} lines and fit order {}, dRV = {:.1f} km/s'.format(i,rms,len(lines_y[w]),fitorder,3.e5*rms/numpy.nanmedian(wave)))
+		if verbose==True: print('Deep line pass {}: RMS={:.3f} Ang for {} lines and fit order {}, dRV = {:.1f} km/s'.format(i,rms,len(lines_y[w]),sfitorder,3.e5*rms/numpy.nanmedian(wave)))
+		lines_yp,lines_xp = [],[]
+
+# reselect lines with improved wavelength calibration
+		all_select = alines[alines<(numpy.nanmax(wave)-0.02*(numpy.nanmax(wave)-numpy.nanmin(wave)))]
+		all_select = all_select[all_select>(numpy.nanmin(wave)+0.02*(numpy.nanmax(wave)-numpy.nanmin(wave)))]
+		for n in all_select:
+			x0 = numpy.argmin(numpy.absolute(wave-n))
+			aslice = atrace[(x0-dwindow):(x0+dwindow+1)]
+#			print(n,numpy.nanmax(aslice),deep_threshold)
+			if numpy.nanmax(aslice)>deep_threshold:
+				lines_yp.append(n)
+				lines_xp.append(x0+numpy.argmax(aslice)-dwindow+1)
+		if len(lines_xp) > len(lines_x):
+			lines_x = numpy.array(lines_xp)
+			lines_y = numpy.array(lines_yp)
+			w = numpy.where(lines_x>0)
+
 	lines_x = lines_x[w]
 	lines_y = lines_y[w]
 	diff = lines_y-numpy.polyval(p2,lines_x)
 	wave = numpy.polyval(p2,numpy.arange(len(atrace)))
 	rms = numpy.nanstd(lines_y-numpy.polyval(p2,lines_x))
-	if verbose==True: print('Final deep line pass: RMS={:.3f} Ang at {:.2f} Ang for {} lines and fit order {}, dRV = {:.1f} km/s'.format(rms,numpy.nanmedian(wave),len(lines_y),fitorder,3.e5*rms/numpy.nanmedian(wave)))
+	if verbose==True: print('Final deep line pass: RMS={:.3f} Ang at {:.2f} Ang for {} lines and fit order {}, dRV = {:.1f} km/s'.format(rms,numpy.nanmedian(wave),len(lines_y),sfitorder,3.e5*rms/numpy.nanmedian(wave)))
 
 # generate reporting structure	
 	cal_wave['COEFF'] = p2
@@ -2393,7 +2445,7 @@ def rectify(im,trace=[],cntr=-1,trim=[],verbose=ERROR_CHECKING,center_kwargs={},
 
 	if save_image!='':
 		hdu = fits.PrimaryHDU(imshift)
-		try: hdu.writeto(save_image,overwrite=clobber)
+		try: hdu.writeto(save_image,overwrite=overwrite)
 		except: print('Warning: could not write rectified image to file {}'.format(save_image))
 
 #  WORK IN PROGRESS
@@ -2434,9 +2486,11 @@ def profileCheck(instructions='',cntr=335,verbose=ERROR_CHECKING,trace_slice=[25
 	return
 
 
-
-def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_file='',mask_file='',cal_wave_file='',cal_flux_file='',reset=False,verbose=ERROR_CHECKING,src_wnd=5,bck_wnd=[15,20],**kwargs):
-
+# full reduction pipeline
+def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_file='',mask_file='',cal_wave_file='',cal_flux_file='',reset=False,verbose=ERROR_CHECKING,src_wnd=5,bck_wnd=[15,20],overwrite=True,**kwargs):
+	'''
+	Full reduction package
+	'''
 	src_wnd0 = copy.deepcopy(src_wnd)
 	bck_wnd0 = copy.deepcopy(bck_wnd)
 	if instructions!='': 
@@ -2458,9 +2512,9 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			if os.path.exists(bias_file) == False: bias_file=''
 		if bias_file!='' and reset==False:
 			if verbose==True: print('Reading in bias frame from file {}'.format(bias_file))
-			redux['BIAS'],redux['BIAS_HEADER'] = readKastFiles(bias_file,mode='')
+			redux['BIAS'],redux['BIAS_HEADER'] = readKastFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
 		else:
-			bias_file='{}/bias.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
+			bias_file='{}/bias_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
 			if verbose==True: print('Reducing bias frames')
 			redux['BIAS'],redux['BIAS_HEADER'] = makeBias(redux['PARAMETERS']['BIAS']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'],output=bias_file)
 
@@ -2471,9 +2525,9 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			if os.path.exists(flat_file) == False: flat_file=''
 		if flat_file!='' and reset==False:
 			if verbose==True: print('Reading in flat field frame from file {}'.format(flat_file))
-			redux['FLAT'],redux['FLAT_HEADER'] = readKastFiles(flat_file,mode='')
+			redux['FLAT'],redux['FLAT_HEADER'] = readKastFiles(flat_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
 		else:
-			flat_file='{}/flat{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
+			flat_file='{}/flat_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
 			if verbose==True: print('Reducing flat field frames')
 			redux['FLAT'],redux['FLAT_HEADER'] = makeFlat(redux['PARAMETERS']['FLAT']['FILES'],redux['BIAS'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'],output=flat_file)
 
@@ -2484,9 +2538,9 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			if os.path.exists(mask_file) == False: mask_file=''
 		if mask_file!='' and reset==False:
 			if verbose==True: print('Reading in mask frame from file {}'.format(mask_file))
-			redux['MASK'],redux['MASK_HEADER'] = readKastFiles(mask_file,mode='')
+			redux['MASK'],redux['MASK_HEADER'] = readKastFiles(mask_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
 		else:
-			mask_file='{}/mask{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
+			mask_file='{}/mask_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
 			if verbose==True: print('Generating mask file')
 			redux['MASK'] = makeMask(redux['BIAS'],redux['FLAT'],output=mask_file)
 			if verbose==True: print('Masking {} bad pixels'.format(int(numpy.nansum(redux['MASK']))))
@@ -2497,7 +2551,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 	if reset==True:
 		if flat_file!='':
 			hdu = fits.PrimaryHDU(data=redux['FLAT'],header=redux['FLAT_HEADER'])
-			hdu.writeto(flat_file,overwrite=True)
+			hdu.writeto(flat_file,overwrite=overwrite)
 
 # SPECTRAL CALIBRATIONS
 # initial arc solution
@@ -2511,11 +2565,14 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		if verbose==True: print('Determining baseline wavelength solution')
 		arcsh,arcshhd = readKastFiles(redux['PARAMETERS']['ARC_SHALLOW']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 		arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
-		grating,gtilt = arcshhd['GRATNG_N'],arcshhd['GRTILT_P']
+# check mode
+		arcmode = kastRBMode(arcshhd)
+		if arcmode!=redux['PARAMETERS']['MODE']: raise ValueError('Warning: arc image mode {} is not the same as reduction mode {}'.format(arcmode,redux['PARAMETERS']['MODE']))
+		grating = kastDispersion(arcshhd)
 		if grating not in list(DISPERSIONS.keys()): raise ValueError('Do not have parameters for grating {}'.format(grating))
-		redux['CAL_WAVE'] = waveCalibrateArcs(arcsh,deep=arcdp,dispersion=grating,middle=True,plot_file='{}/diagnostic_wavecal_initial.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER']))
+		redux['CAL_WAVE'] = waveCalibrateArcs(arcsh,deep=arcdp,dispersion=grating,middle=True,mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_initial.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER']))
 # save this to pickle file
-		f = open('{}/cal_wave.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER']),'wb')
+		f = open('{}/cal_wave_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']),'wb')
 		pickle.dump(redux['CAL_WAVE'],f)
 		f.close()
 		
@@ -2538,21 +2595,23 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		bck_wnd = copy.deepcopy(bck_wnd0)
 		if 'BACK' in list(redux['PARAMETERS']['FLUXCAL'].keys()): bck_wnd = redux['PARAMETERS']['FLUXCAL']['BACK']
 # reduce data, determine trace and extract spectrum
-		imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd['EXPTIME'])
+#def reduceScienceImage(image, bias, flat, mask=[], hd={}, mode='', rdmode='', gain=0., rn=0., exposure='EXPTIME', mask_image=True, folder='./', verbose=ERROR_CHECKING):
+		imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd=hd)
 		cntr = findPeak(imr)
 		trace = traceDispersion(imr,cntr=cntr,window=src_wnd,method='maximum',plot_file='{}/diagnostic_trace_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME']))
 		imrect = rectify(imr,trace)
 		varrect = rectify(var,trace)
 		maskrect = rectify(redux['MASK'],trace)
 		cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME']))
-		profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
+#		profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
+		profile = numpy.ones(int(2*src_wnd+1))
 		spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME']))
 		spflx.name = redux['PARAMETERS']['FLUXCAL']['NAME']
 		spflx.header = hd
 #		spflx = extractSpectrum(imr,var,mask=redux['MASK'],trace=trace,src_wnd=10)
 		arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 		arcrect = rectify(arcdp,trace)
-		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME']))
+		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME']))
 		spflx.applyWaveCal(arcrecal)
 		redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],plot_file='{}/diagnostic_fluxcal.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER']))
 		redux['CAL_FLUX']['TRACE'] = trace
@@ -2560,7 +2619,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		spflx.applyFluxCal(redux['CAL_FLUX'])
 		redux[redux['PARAMETERS']['FLUXCAL']['NAME']] = spflx
 # save this to pickle file
-		f = open('{}/cal_flux.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER']),'wb')
+		f = open('{}/cal_flux_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']),'wb')
 		pickle.dump(redux['CAL_FLUX'],f)
 		f.close()
 # plot  and save
@@ -2584,7 +2643,8 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			bck_wnd = copy.deepcopy(bck_wnd0)
 			if 'BACK' in list(redux['PARAMETERS']['TELLURIC'][tstar].keys()): bck_wnd = redux['PARAMETERS']['TELLURIC'][tstar]['BACK']
 # reduce imaging data
-			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd['EXPTIME'])
+			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd=hd)
+#			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd['EXPTIME'])
 # trace source and rectify
 			cntr = findPeak(imr)
 			trace = traceDispersion(imr,cntr=cntr,window=src_wnd,method='maximum',plot_file='{}/diagnostic_trace_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
@@ -2594,7 +2654,8 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 # find center
 			cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
 # make profile
-			profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
+#			profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
+			profile = numpy.ones(int(2*src_wnd+1))
 # extract spectrum
 			spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
 			spflx.name = tstar
@@ -2602,21 +2663,21 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 # reidentify arc lines
 			arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 			arcrect = rectify(arcdp,trace)
-			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
+			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
 # apply wavelength calibration
 			spflx.applyWaveCal(arcrecal)
 #			spflx.applyWaveCal(redux['CAL_WAVE'])
 # apply flux calibration
 			spflx.applyFluxCal(redux['CAL_FLUX'])
 # compute telluric corection
-			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,plot_file='{}/diagnostic_telluic_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
+			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,plot_file='{}/diagnostic_telluic_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],tstar))
 			redux['CAL_TELL'][tstar]['NAME'] = tstar
 			redux['CAL_TELL'][tstar]['TRACE'] = trace
 			redux['CAL_TELL'][tstar]['PROFILE'] = profile
 #			spflx.applyTelluricCal(redux['CAL_TELL'][tstar])
 			redux[tstar] = spflx
 # save this to pickle file
-			f = open('{}/cal_tell_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar),'wb')
+			f = open('{}/cal_tell_{}_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']),'wb')
 			pickle.dump(redux['CAL_TELL'][tstar],f)
 			f.close()
 # plot and save
@@ -2639,7 +2700,8 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 				im = ims
 				hd = hds
 # analyze image data
-			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd['EXPTIME'],verbose=verbose,)
+			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd=hd,verbose=verbose)
+#			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd['EXPTIME'],verbose=verbose,)
 # set extraction parameters
 			src_wnd = copy.deepcopy(src_wnd0)
 			if 'WINDOW' in list(redux['PARAMETERS']['SOURCE'][src].keys()): 
@@ -2695,7 +2757,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 # reapply arc solution
 			arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 			arcrect = rectify(arcdp,trace)
-			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
+			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
 			spflx.applyWaveCal(arcrecal)
 # apply flux calibration
 			if 'CAL_FLUX' in list(redux.keys()): spflx.applyFluxCal(redux['CAL_FLUX'])
@@ -2723,6 +2785,183 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 # KAST SPECTRAL ANALYSIS FUNCTIONS
 # These functions perform some basic analysis on spectra
 ############################################################
+
+def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
+	'''
+	Compares to spectra to each other and returns the best fit statistic and scale factor
+	Input: spectra objects
+	Output: fit stat and scale factor 
+	'''
+# make sure both spectra conform to same wave and flux units
+	sp2 = copy.deepcopy(sp2orig)
+	try:
+		sp2.convertWave(sp1.wave.unit)
+	except:
+		raise ValueError('Cannot convert second spectrum with wave units {} to wave units {}'.format(sp2.wave.unit,sp1.wave.unit))
+	try:
+		sp2.convertFlux(sp1.flux.unit)
+	except:
+		raise ValueError('Cannot convert second spectrum with flux units {} to flux units {}'.format(sp2.flux.unit,sp1.flux.unit))
+
+# interpolate onto a common wavelength scale
+	wave = sp1.wave.value
+	f1 = sp1.flux.value
+	u1 = sp1.unc.value
+	f2interp = interp1d(sp2.wave.value,sp2.flux.value,bounds_error=False,fill_value=0.)
+	u2interp = interp1d(sp2.wave.value,sp2.unc.value,bounds_error=False,fill_value=0.)
+	f2 = f2interp(wave)
+	u2 = u2interp(wave)
+
+# check uncertainties
+	if numpy.isnan(numpy.median(u1))==True and numpy.isnan(numpy.median(u2))==False: vtot = u2**2
+	elif numpy.isnan(numpy.median(u1))==False and numpy.isnan(numpy.median(u2))==True: vtot = u1**2
+	elif numpy.isnan(numpy.median(u1))==True and numpy.isnan(numpy.median(u2))==True: vtot=numpy.ones(len(wave))
+	else: vtot = u1**2+u2**2
+
+# fit range
+	weights = numpy.ones(len(wave))
+	if len(fit_range)>1:
+		weights[wave<numpy.nanmin(fit_range)]=0
+		weights[wave>numpy.nanmax(fit_range)]=0
+
+# using just chi2 for now
+	scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*(f2**2)/vtot)
+	stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
+
+# add in a little iteration
+	if fitcycle>1:
+		for i in range(fitcycle):
+			wdiff = numpy.absolute(weights*(f1-f2*scale_factor)**2/vtot)
+			weights[wdiff>sclip]==0
+			scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*(f2**2)/vtot)
+			stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
+
+	if plot==True or plot_file!='':
+		uncplot = vtot**0.5
+		if numpy.isnan(numpy.median(u1))==True and numpy.isnan(numpy.median(u2))==True: uncplot = numpy.zeros(len(wave))
+		print(numpy.nanmedian(uncplot))
+		xlim = kwargs.get('xlim',[numpy.nanmin(sp1.wave.value),numpy.nanmax(sp1.wave.value)])
+		ylim = kwargs.get('ylim',[numpy.nanmin([0,numpy.quantile(f1,0.05)]),1.2*numpy.quantile(f1,0.95)])
+		fig,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
+		ax1.plot(wave,f1,c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
+		ax1.plot(wave,f2*scale_factor,c=kwargs.get('color',PLOT_DEFAULTS['comparison_color']),ls=kwargs.get('ls',PLOT_DEFAULTS['comparison_ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['comparison_alpha']))
+		ax1.legend(kwargs.get('legend',[sp1.name,sp2.name]),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		ax1.plot(wave,uncplot**0.5,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
+		ax1.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
+		ax1.fill_between(wave,numpy.zeros(len(wave))+ylim[0],(1-weights)*ylim[1],facecolor='grey',alpha=0.2)
+#		ax1.set_xlim(kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)]))
+		ax1.set_ylim(ylim)
+		ax1.set_ylabel(kwargs.get('ylabel',r'Flux ({})'.format(sp1.flux.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+#		ax1.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+#		ax1.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		diff = f1-f2*scale_factor
+		ylim2 = kwargs.get('ylim2',[-3.*numpy.nanstd(diff),3.*numpy.nanstd(diff)])
+		ax2.plot(wave,diff,c=kwargs.get('background_color',PLOT_DEFAULTS['background_color']),ls=kwargs.get('background_ls',PLOT_DEFAULTS['background_ls']),alpha=kwargs.get('background_alpha',PLOT_DEFAULTS['background_alpha']))
+		ax2.plot(wave[weights==1],diff[weights==1],c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
+		ax2.fill_between(wave,uncplot,-1.*uncplot,facecolor=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),linestyle=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
+#		ax2.plot(wave,-1.*sp.unc.value,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
+		ax2.set_xlabel(kwargs.get('xlabel',r'Wavelength ({})'.format(sp1.wave.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		ax2.set_ylabel(kwargs.get('ylabel','O-C'),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		ax2.set_xlim(xlim)
+		ax2.set_ylim(ylim2)
+#		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+#		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
+		if plot_file!='': fig.savefig(plot_file)
+
+	return stat, scale_factor
+
+def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwargs):
+	'''
+	A stripped down version of compareSpectra() to address errors 
+	'''
+	sp2 = copy.deepcopy(sp2orig)
+	sp2.convertWave(sp1.wave.unit)
+	sp2.convertFlux(sp1.flux.unit)
+	wave = sp1.wave.value
+	f1 = sp1.flux.value
+	u1 = sp1.unc.value
+	f2interp = interp1d(sp2.wave.value,sp2.flux.value,bounds_error=False,fill_value=0.)
+	f2 = f2interp(wave)
+	vtot = u1**2
+	weights = numpy.ones(len(wave))
+	if len(fit_range)>1:
+		weights[wave<numpy.nanmin(fit_range)]=0
+		weights[wave>numpy.nanmax(fit_range)]=0
+	scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*f2*f2/vtot)
+	stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
+	if plot==True: 
+		plt.clf()
+		xlim = kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)])
+		ylim = kwargs.get('ylim',[-2.*numpy.nanmedian(u1),numpy.nanquantile(f1,0.95)+2.*numpy.nanmedian(u1)])
+		fig = plt.figure(figsize=[8,6])
+		grid = plt.GridSpec(4, 1, hspace=0, wspace=0.2)
+		ax_top = fig.add_subplot(grid[:-1,0])
+		ax_btm = fig.add_subplot(grid[-1,0])
+		ax_top.plot(wave,u1,'k--')
+		ax_top.plot(wave,f1,'k-')
+		ax_top.plot(wave,f2*scale_factor,'m-')
+		ax_top.plot(wave,numpy.zeros(len(wave)),'k:')
+		ax_top.legend([sp1.name,sp2.name],fontsize=16)
+		ax_top.set_xlim(xlim)
+		ax_top.set_ylim(ylim)
+		ax_top.set_ylabel('Flux Density',fontsize=16)
+		ax_btm.plot(wave,f1-f2*scale_factor,'k-')
+		ax_btm.plot(wave,u1,'k--')
+		ax_btm.plot(wave,-1.*u1,'k--')
+		ax_btm.fill_between(wave,-1.*u1,u1,color='k',alpha=0.1)
+		ax_btm.plot(wave,numpy.zeros(len(wave)),'k--')
+		ax_btm.set_xlim(xlim)
+		ax_btm.set_ylim([-3.*numpy.nanmedian(u1),3.*numpy.nanmedian(u1)])
+		ax_btm.set_xlabel('Wavelength (Angstrom)',fontsize=16)
+		ax_btm.set_ylabel('O-C',fontsize=16)
+
+# 		fig,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
+# 		ax1.plot(wave,f1,c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
+# 		ax1.plot(wave,f2*scale_factor,c=kwargs.get('color',PLOT_DEFAULTS['comparison_color']),ls=kwargs.get('ls',PLOT_DEFAULTS['comparison_ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['comparison_alpha']))
+# 		ax1.legend(kwargs.get('legend',[sp1.name,sp2.name]),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+# 		ax1.plot(wave,u1,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
+# 		ax1.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
+# 		ax1.fill_between(wave,-1.*u1,u1,facecolor='k',alpha=0.1)
+# #		ax1.set_xlim(kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)]))
+# 		ax1.set_xlim(xlim)
+# 		ax1.set_ylim(ylim)
+# 		ax1.set_ylabel(kwargs.get('ylabel',r'Flux ({})'.format(sp1.flux.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+# #		ax1.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+# #		ax1.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+# 		diff = f1-f2*scale_factor
+# 		ylim2 = kwargs.get('ylim2',[-3.*numpy.nanstd(diff),3.*numpy.nanstd(diff)])
+# 		ax2.plot(wave,diff,c=kwargs.get('background_color',PLOT_DEFAULTS['background_color']),ls=kwargs.get('background_ls',PLOT_DEFAULTS['background_ls']),alpha=kwargs.get('background_alpha',PLOT_DEFAULTS['background_alpha']))
+# 		ax2.plot(wave[weights==1],diff[weights==1],c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
+# 		ax2.fill_between(wave,u1,-1.*u1,facecolor=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),linestyle=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
+# #		ax2.plot(wave,-1.*sp.unc.value,c=kwargs.get('unc_color',PLOT_DEFAULTS['unc_color']),ls=kwargs.get('unc_ls',PLOT_DEFAULTS['unc_ls']),alpha=kwargs.get('unc_alpha',PLOT_DEFAULTS['unc_alpha']))
+# 		ax2.set_xlabel(kwargs.get('xlabel',r'Wavelength ({})'.format(sp1.wave.unit)),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+# 		ax2.set_ylabel(kwargs.get('ylabel','O-C'),fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+# 		ax2.set_xlim(xlim)
+# 		ax2.set_ylim(ylim2)
+# #		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+# #		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
+# 		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
+		if plot_file!='': fig.savefig(plot_file)
+	return stat,scale_factor
+
+
+
+def combineSpectra():
+	'''
+	Combines spectra together
+	Input: spectra objects
+	Output: combined spectrum object 
+	'''
+	pass
+
+def stitchOrders():
+	'''
+	Stitches together multiple orders into one spectrum
+	Input: spectra objects
+	Output: combined spectrum object 
+	'''
+	pass
 
 def classifyTemplate():
 	pass
