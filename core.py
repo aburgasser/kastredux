@@ -1485,6 +1485,14 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 					dt['BACK'] = [int(x) for x in dt['BACK']]
 				if 'WINDOW' in list(dt.keys()): dt['WINDOW'] = int(dt['WINDOW'])
 				parameters[ref][dt['NAME']] = dt
+			elif ref in ['WAVE_INITIAL']:
+				dt = {}				
+				for p in parts[1:]:
+					kv = p.split('=')
+					if len(kv)>1: dt[kv[0].upper().strip()] = float(kv[1])
+				if 'WAVE' not in list(dt.keys()): raise ValueError('information list for {} requires WAVE keyword; current lists gives {}'.format(ref,dt))
+				if 'PIXEL' not in list(dt.keys()): raise ValueError('information list for {} requires PIXEL keyword; current lists gives {}'.format(ref,dt))
+				parameters[ref] = dt
 			else: parameters[ref] = parts[1].strip()
 	for r in required:
 		if r not in list(parameters.keys()): print('WARNING: required parameter {} not in instruction file'.format(r))
@@ -1492,6 +1500,7 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 	if 'OUTPUT_FOLDER' not in list(parameters.keys()): parameters['OUTPUT_FOLDER'] = parameters['REDUCTION_FOLDER']
 	if 'ARC_SHALLOW' not in list(parameters.keys()) and 'ARC' in list(parameters.keys()): parameters['ARC_SHALLOW'] = parameters['ARC']
 	if 'ARC_DEEP' not in list(parameters.keys()) and 'ARC' in list(parameters.keys()): parameters['ARC_DEEP'] = parameters['ARC']
+	if 'WAVE_INITIAL' not in list(parameters.keys()): parameters['WAVE_INITIAL'] = {'WAVE': 0., 'PIXEL': 0}
 	for r in ['ARC_SHALLOW','ARC_DEEP']:
 		if r not in list(parameters.keys()): print('WARNING: required parameter {} not in instruction file'.format(r))
 
@@ -1776,7 +1785,7 @@ def findPeak(im,rng=[],cntr=-1,window=50,trace_slice=[],method='maximum',verbose
 		except:
 			if verbose==True: print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
 		plt.close()
-		plt.clf()
+#		plt.clf()
 
 # just using maximum; could do something smarter
 #	if method=='maximum': 
@@ -1845,7 +1854,7 @@ def traceDispersion(im,cntr=-1,window=5,step_size=5,trace_slice=[],fit_order=3,f
 		except:
 			print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
 		plt.close()
-		plt.clf()
+#		plt.clf()
 
 	return numpy.polyval(p,numpy.arange(len(im[0,:])))
 
@@ -1896,7 +1905,7 @@ def spatialProfile(im,cntr=-1,window=10,verbose=ERROR_CHECKING,plot_file=''):
 		except:
 			print('Warning: could not save profile plot to file {}'.format(plot_file))
 		plt.close()
-		plt.clf()
+#		plt.clf()
 	return profile
 
 
@@ -2084,12 +2093,12 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 		except:
 			print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
 		plt.close()
-		plt.clf()
+#		plt.clf()
 # generate a spectrum object
 	return sp
 
 
-def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_order=6,sfit_order=2,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=0.,cntr=0.,fitcycle=5,sclip=2.,plot_file=''):
+def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_order=6,sfit_order=2,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=0.,pixel0=0,cntr=0.,fitcycle=5,sclip=2.,plot_file=''):
 	'''
 	Wavelength calibration from arc lamp
 	Input: arc, list of lines
@@ -2100,7 +2109,7 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 # check inputs
 	if dispersion in list(DISPERSIONS.keys()):
 		resolution = DISPERSIONS[dispersion]['RESOLUTION']
-		lam0 = DISPERSIONS[dispersion]['LAM0']
+		if lam0==0.: lam0 = DISPERSIONS[dispersion]['LAM0']
 	if len(prior)==0 and (resolution==0. or lam0 ==0.):
 		raise ValueError('You must provide prior fit coefficients (prior={}), specify the dispersion (dispersion={}), or specify the resolution (resolution={}) and strongest line wavelength (lam0={})'.format(prior,dispersion,resolution,lam0))
 
@@ -2129,6 +2138,7 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 				4358.33,4471.50,4678.16,4799.92,4921.93,5015.68,5085.82,5460.74,5769.59,5790.65,5875.62])
 		alines = hehgcd
 		strong = numpy.array([3466.55,4046.56,4358.33,4678.16,4799.92,5085.82,5460.74,5875.62,5944.83])
+		fit_order = 4
 	else: raise ValueError('You must specify the red/blue mode (mode=RED or BLUE); mode={} was passed'.format(mode))
 
 	cal_wave = {}
@@ -2155,11 +2165,13 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 	# 	arctrace_deep = numpy.nanmedian(arcdp,axis=0)
 
 # if no prior provided, make initial guess from resolution, center to strongest line, and do 1st order fit
+	if pixel0 == 0: pixel0=numpy.argmax(arctrace)
+	pixel0 = int(pixel0)
 	if 'COEFF' in list(prior.keys()):
 		p1 = prior['COEFF']
 		wave1 = numpy.polyval(p1,numpy.arange(len(arctrace)))
 	else: 
-		p0 = [resolution,lam0-resolution*numpy.argmax(arctrace)]
+		p0 = [resolution,lam0-resolution*pixel0]
 		wave0 = numpy.polyval(p0,numpy.arange(len(arctrace)))
 
 # now center the strongest feature
@@ -2255,7 +2267,7 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 		plt.xlim([0,len(wave)])
 		plt.ylim([-3.*rms,3.*rms])
 		for i,x in enumerate(lines_x): 
-			plt.text(x,diff[i],' {:.3f} '.format(lines_y[i]),rotation=45.,horizontalalignment='left',fontsize=5)
+			plt.text(x,diff[i],' {:.2f} \n {:.0f} '.format(lines_y[i],x),rotation=45.,horizontalalignment='left',fontsize=5)
 		plt.xticks(fontsize=16)
 		plt.yticks(fontsize=16)
 		plt.xlabel('Pixel',fontsize=16)
@@ -2286,12 +2298,12 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 		except:
 			print('Warning: could not save arc wavelength calibration diagnostics to file {}'.format(plot_file))
 		plt.close()
-		plt.clf()
+#		plt.clf()
 	return cal_wave
 
 
 
-def fluxCalibrate(fluxsp,name,fit_order=5,fitcycle=10,sclip=3.,fluxcalfolder=FLUXCALFOLDER,calwaveunit=DEFAULT_WAVE_UNIT,calfluxunit=DEFAULT_FLUX_UNIT,plot_file='',verbose=ERROR_CHECKING):
+def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],fluxcalfolder=FLUXCALFOLDER,calwaveunit=DEFAULT_WAVE_UNIT,calfluxunit=DEFAULT_FLUX_UNIT,plot_file='',verbose=ERROR_CHECKING):
 	'''
 	Uses spectrum of flux calibrator to determine the flux calibration correction
 	Input: flux cal spectrum, flux cal name
@@ -2303,16 +2315,18 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fitcycle=10,sclip=3.,fluxcalfolder=FLU
 	calfile = '{}/{}'.format(fluxcalfolder,FLUXCALS[name.upper()]['FILE'])
 	if os.path.exists(calfile)==False:
 		raise ValueError('Cannot find flux standard file {} please check your paths'.format(calfile))
-
 # read in flux cal and compute ratio
 	fcal = readSpectrum(calfile,flux_unit=calfluxunit,wave_unit=calwaveunit)
 	ratio = fcal/fluxsp
+	if len(fit_range) == 0: fit_range = [numpy.nanmin(fcal.wave.value),numpy.nanmax(fcal.wave.value)]
 
 # iteratively fit LOG of ratio with rejection
 	mask = numpy.zeros(len(ratio.wave))
 	mask[ratio.flux<=0] = 1
+	mask[ratio.wave.value<fit_range[0]] = 1
+	mask[ratio.wave.value>fit_range[1]] = 1
 	mask[numpy.isfinite(ratio.flux)==False] = 1
-	for i in range(fitcycle):
+	for i in range(fit_cycle):
 		p = numpy.polyfit(ratio.wave.value[mask==0],numpy.log10(ratio.flux[mask==0]),fit_order)
 		diff = numpy.log10(ratio.flux)-numpy.polyval(p,ratio.wave.value)
 		mask[numpy.absolute(diff)>(sclip*numpy.nanstd(diff[mask==0]))] = 1
@@ -2358,7 +2372,7 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fitcycle=10,sclip=3.,fluxcalfolder=FLU
 		except:
 			print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
 		plt.close()
-		plt.clf()
+#		plt.clf()
 	return cal_flux
 
 def telluricCalibrate(tellsp,fitrange=[6200,8800],fit_order=5,fitcycle=10,sclip=3.,plot_file='',verbose=ERROR_CHECKING):
@@ -2434,7 +2448,7 @@ def telluricCalibrate(tellsp,fitrange=[6200,8800],fit_order=5,fitcycle=10,sclip=
 		except:
 			print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
 		plt.close()
-		plt.clf()
+#		plt.clf()
 
 	return cal_tell
 
@@ -2501,7 +2515,7 @@ def profileCheck(instructions='',cntr=335,verbose=ERROR_CHECKING,trace_slice=[25
 		if verbose==True: print('Checking spatial profile of {}'.format(src))
 		im,hd = readKastFiles(parameters['SOURCE'][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
 		if 'CENTER' in list(parameters['SOURCE'][src].keys()): cntr = int(parameters['SOURCE'][src]['CENTER'])
-		cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src))
+		cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src,parameters['MODE']))
 		if verbose==True: print('Best center = {}'.format(cntr))
 
 	return
@@ -2605,7 +2619,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		if arcmode!=redux['PARAMETERS']['MODE']: raise ValueError('Warning: arc image mode {} is not the same as reduction mode {}'.format(arcmode,redux['PARAMETERS']['MODE']))
 		grating = kastDispersion(arcshhd)
 		if grating not in list(DISPERSIONS.keys()): raise ValueError('Do not have parameters for grating {}'.format(grating))
-		redux['CAL_WAVE'] = waveCalibrateArcs(arcsh,deep=arcdp,dispersion=grating,middle=True,mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_initial.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER']))
+		redux['CAL_WAVE'] = waveCalibrateArcs(arcsh,deep=arcdp,dispersion=grating,middle=True,lam0=redux['PARAMETERS']['WAVE_INITIAL']['WAVE'],pixel0=redux['PARAMETERS']['WAVE_INITIAL']['PIXEL'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_initial_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
 # save this to pickle file
 		f = open('{}/cal_wave_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']),'wb')
 		pickle.dump(redux['CAL_WAVE'],f)
@@ -2635,22 +2649,25 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 #def reduceScienceImage(image, bias, flat, mask=[], hd={}, mode='', rdmode='', gain=0., rn=0., exposure='EXPTIME', mask_image=True, folder='./', verbose=ERROR_CHECKING):
 		imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd=hd)
 		cntr = findPeak(imr)
-		trace = traceDispersion(imr,cntr=cntr,window=src_wnd,method='maximum',plot_file='{}/diagnostic_trace_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME']))
+		trace = traceDispersion(imr,cntr=cntr,window=src_wnd,method='maximum',plot_file='{}/diagnostic_trace_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
 		imrect = rectify(imr,trace)
 		varrect = rectify(var,trace)
 		maskrect = rectify(redux['MASK'],trace)
-		cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME']))
+		cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
 #		profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
 		profile = numpy.ones(int(2*src_wnd+1))
-		spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME']))
+		spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
 		spflx.name = redux['PARAMETERS']['FLUXCAL']['NAME']
 		spflx.header = hd
 #		spflx = extractSpectrum(imr,var,mask=redux['MASK'],trace=trace,src_wnd=10)
 		arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 		arcrect = rectify(arcdp,trace)
-		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME']))
+		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
 		spflx.applyWaveCal(arcrecal)
-		redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,plot_file='{}/diagnostic_fluxcal.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER']))
+		if redux['PARAMETERS']['MODE'] == 'BLUE':
+			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,fit_range=[3700.,5300.],plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
+		else:
+			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
 		redux['CAL_FLUX']['TRACE'] = trace
 		redux['CAL_FLUX']['PROFILE'] = profile
 		spflx.applyFluxCal(redux['CAL_FLUX'])
@@ -2663,7 +2680,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		fig = spflx.plot(ylim=[0,1.2*numpy.quantile(spflx.flux.value,0.95)])
 		fig.figure.savefig('{}/kast{}_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['DATE']))
 		plt.close()
-		plt.clf()
+#		plt.clf()
 		spflx.toFile('{}/kast{}_{}_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['DATE']))
 		spflx.toFile('{}/kast{}_{}_{}.txt'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['DATE']))
 
@@ -2685,30 +2702,30 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 #			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd['EXPTIME'])
 # trace source and rectify
 			cntr = findPeak(imr)
-			trace = traceDispersion(imr,cntr=cntr,window=src_wnd,method='maximum',plot_file='{}/diagnostic_trace_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
+			trace = traceDispersion(imr,cntr=cntr,window=src_wnd,method='maximum',plot_file='{}/diagnostic_trace_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 			imrect = rectify(imr,trace)
 			varrect = rectify(var,trace)
 			maskrect = rectify(redux['MASK'],trace)
 # find center
-			cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
+			cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 # make profile
 #			profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
 			profile = numpy.ones(int(2*src_wnd+1))
 # extract spectrum
-			spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
+			spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 			spflx.name = tstar
 			spflx.header = hd
 # reidentify arc lines
 			arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 			arcrect = rectify(arcdp,trace)
-			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar))
+			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 # apply wavelength calibration
 			spflx.applyWaveCal(arcrecal)
 #			spflx.applyWaveCal(redux['CAL_WAVE'])
 # apply flux calibration
 			spflx.applyFluxCal(redux['CAL_FLUX'])
 # compute telluric corection
-			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,plot_file='{}/diagnostic_telluic_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],tstar))
+			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,plot_file='{}/diagnostic_telluic_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 			redux['CAL_TELL'][tstar]['NAME'] = tstar
 			redux['CAL_TELL'][tstar]['TRACE'] = trace
 			redux['CAL_TELL'][tstar]['PROFILE'] = profile
@@ -2722,7 +2739,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			fig = spflx.plot(ylim=[0,1.2*numpy.quantile(spflx.flux.value,0.95)])
 			fig.figure.savefig('{}/kast{}_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],tstar,redux['PARAMETERS']['DATE']))
 			plt.close()
-			plt.clf()
+#			plt.clf()
 			spflx.toFile('{}/kast{}_{}_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],tstar,redux['PARAMETERS']['DATE']))
 			spflx.toFile('{}/kast{}_{}_{}.txt'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],tstar,redux['PARAMETERS']['DATE']))
 
@@ -2778,7 +2795,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			maskrect = rectify(redux['MASK'],trace)
 # recenter?
 			if cflag == True or cntr<0: 
-				cntr = findPeak(imrect,cntr=cntr,window=src_wnd,plot_file='{}/diagnostic_profile_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
+				cntr = findPeak(imrect,cntr=cntr,window=src_wnd,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src,redux['PARAMETERS']['MODE']))
 				if verbose==True: print('Recentered source to {}'.format(cntr))
 # choose profile and extract
 			if pflag.upper()=='SOURCE': 
@@ -2790,13 +2807,13 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			else: 
 				if verbose==True: print('Using flat spatial profile')
 				profile = numpy.ones(int(2*src_wnd+1))
-			spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,cntr=cntr,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
+			spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,cntr=cntr,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src,redux['PARAMETERS']['MODE']))
 			spflx.name = src
 			spflx.header = hd
 # reapply arc solution
 			arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 			arcrect = rectify(arcdp,trace)
-			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src))
+			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src,redux['PARAMETERS']['MODE']))
 			spflx.applyWaveCal(arcrecal)
 # apply flux calibration
 			if 'CAL_FLUX' in list(redux.keys()): spflx.applyFluxCal(redux['CAL_FLUX'])
@@ -2809,12 +2826,12 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			fig = spflx.plot(ylim=[0,1.2*numpy.quantile(spflx.flux.value,0.95)])
 			fig.figure.savefig('{}/kast{}_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],src,redux['PARAMETERS']['DATE']))
 			plt.close()
-			plt.clf()
+#			plt.clf()
 			spflx.toFile('{}/kast{}_{}_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],src,redux['PARAMETERS']['DATE']))
 			spflx.toFile('{}/kast{}_{}_{}.txt'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],src,redux['PARAMETERS']['DATE']))
 
 # save reduction information to a pickle file
-	f = open('{}/reduction_structure.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER']),'wb')
+	f = open('{}/reduction_structure_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']),'wb')
 	pickle.dump(redux,f)
 	f.close()
 
@@ -2907,7 +2924,10 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 #		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 #		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
-		if plot_file!='': fig.savefig(plot_file)
+		if plot_file!='': 
+			fig.savefig(plot_file)
+		plt.close()
+#		plt.clf()
 
 	return stat, scale_factor
 
@@ -2982,7 +3002,11 @@ def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwa
 # #		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 # #		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 # 		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
-		if plot_file!='': fig.savefig(plot_file)
+		if plot_file!='': 
+			fig.savefig(plot_file)
+		plt.close()
+#		plt.clf()
+
 	return stat,scale_factor
 
 
