@@ -1782,9 +1782,9 @@ def findPeak(im,rng=[],cntr=-1,window=50,trace_slice=[],method='maximum',verbose
 		plt.tight_layout()
 		try:
 			plt.savefig(plot_file)
+			plt.close()
 		except:
 			if verbose==True: print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
-		plt.close()
 #		plt.clf()
 
 # just using maximum; could do something smarter
@@ -1851,9 +1851,9 @@ def traceDispersion(im,cntr=-1,window=5,step_size=5,trace_slice=[],fit_order=3,f
 		plt.tight_layout()
 		try:
 			plt.savefig(plot_file)
+			plt.close()
 		except:
 			print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
-		plt.close()
 #		plt.clf()
 
 	return numpy.polyval(p,numpy.arange(len(im[0,:])))
@@ -1902,9 +1902,9 @@ def spatialProfile(im,cntr=-1,window=10,verbose=ERROR_CHECKING,plot_file=''):
 		plt.tight_layout()
 		try:
 			plt.savefig(plot_file)
+			plt.close()
 		except:
 			print('Warning: could not save profile plot to file {}'.format(plot_file))
-		plt.close()
 #		plt.clf()
 	return profile
 
@@ -2090,9 +2090,9 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 		plt.tight_layout()
 		try:
 			plt.savefig(plot_file)
+			plt.close()
 		except:
 			print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
-		plt.close()
 #		plt.clf()
 # generate a spectrum object
 	return sp
@@ -2295,9 +2295,9 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 		plt.tight_layout()
 		try:
 			plt.savefig(plot_file)
+			plt.close()
 		except:
 			print('Warning: could not save arc wavelength calibration diagnostics to file {}'.format(plot_file))
-		plt.close()
 #		plt.clf()
 	return cal_wave
 
@@ -2369,9 +2369,9 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 		plt.tight_layout()
 		try:
 			plt.savefig(plot_file)
+			plt.close()
 		except:
 			print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
-		plt.close()
 #		plt.clf()
 	return cal_flux
 
@@ -2445,9 +2445,9 @@ def telluricCalibrate(tellsp,fitrange=[6200,8800],fit_order=5,fitcycle=10,sclip=
 		plt.tight_layout()
 		try:
 			plt.savefig(plot_file)
+			plt.close()
 		except:
 			print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
-		plt.close()
 #		plt.clf()
 
 	return cal_tell
@@ -2926,7 +2926,7 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
 		if plot_file!='': 
 			fig.savefig(plot_file)
-		plt.close()
+			plt.close()
 #		plt.clf()
 
 	return stat, scale_factor
@@ -3004,7 +3004,7 @@ def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwa
 # 		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
 		if plot_file!='': 
 			fig.savefig(plot_file)
-		plt.close()
+			plt.close()
 #		plt.clf()
 
 	return stat,scale_factor
