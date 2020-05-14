@@ -174,7 +174,7 @@ def kastRN(hdr,keyword_mode='VERSION',keyword_read='READ-SPD'):
 	else:
 		return CCD_PARAMETERS[index]['RN']
 
-# extract read noise from image header
+# extract dispersion from image header
 def kastDispersion(hdr,keyword_mode='VERSION',keyword_blue_dispersion='GRISM_N',keyword_red_dispersion='GRATNG_N'):
 # get R/B mode
 	mode = kastRBMode(hdr,keyword=keyword_mode)
@@ -1489,7 +1489,7 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 				dt = {}				
 				for p in parts[1:]:
 					kv = p.split('=')
-					if len(kv)>1: dt[kv[0].upper().strip()] = float(kv[1])
+					if len(kv)>1: dt[kv[0].upper().strip()] = [float(x) for x in kv[1].split(',')]
 				if 'WAVE' not in list(dt.keys()): raise ValueError('information list for {} requires WAVE keyword; current lists gives {}'.format(ref,dt))
 				if 'PIXEL' not in list(dt.keys()): raise ValueError('information list for {} requires PIXEL keyword; current lists gives {}'.format(ref,dt))
 				parameters[ref] = dt
@@ -1500,7 +1500,7 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 	if 'OUTPUT_FOLDER' not in list(parameters.keys()): parameters['OUTPUT_FOLDER'] = parameters['REDUCTION_FOLDER']
 	if 'ARC_SHALLOW' not in list(parameters.keys()) and 'ARC' in list(parameters.keys()): parameters['ARC_SHALLOW'] = parameters['ARC']
 	if 'ARC_DEEP' not in list(parameters.keys()) and 'ARC' in list(parameters.keys()): parameters['ARC_DEEP'] = parameters['ARC']
-	if 'WAVE_INITIAL' not in list(parameters.keys()): parameters['WAVE_INITIAL'] = {'WAVE': 0., 'PIXEL': 0}
+	if 'WAVE_INITIAL' not in list(parameters.keys()): parameters['WAVE_INITIAL'] = {'WAVE': [], 'PIXEL': []}
 	for r in ['ARC_SHALLOW','ARC_DEEP']:
 		if r not in list(parameters.keys()): print('WARNING: required parameter {} not in instruction file'.format(r))
 
@@ -2098,7 +2098,7 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 	return sp
 
 
-def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_order=6,sfit_order=2,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=0.,pixel0=0,cntr=0.,fitcycle=5,sclip=2.,plot_file=''):
+def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_order=6,sfit_order=2,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=[],pixel0=[],cntr=0.,fitcycle=5,sclip=2.,plot_file=''):
 	'''
 	Wavelength calibration from arc lamp
 	Input: arc, list of lines
@@ -2109,7 +2109,7 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 # check inputs
 	if dispersion in list(DISPERSIONS.keys()):
 		resolution = DISPERSIONS[dispersion]['RESOLUTION']
-		if lam0==0.: lam0 = DISPERSIONS[dispersion]['LAM0']
+		if len(lam0)==0.: lam0 = [DISPERSIONS[dispersion]['LAM0']]
 	if len(prior)==0 and (resolution==0. or lam0 ==0.):
 		raise ValueError('You must provide prior fit coefficients (prior={}), specify the dispersion (dispersion={}), or specify the resolution (resolution={}) and strongest line wavelength (lam0={})'.format(prior,dispersion,resolution,lam0))
 
@@ -2165,13 +2165,15 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 	# 	arctrace_deep = numpy.nanmedian(arcdp,axis=0)
 
 # if no prior provided, make initial guess from resolution, center to strongest line, and do 1st order fit
-	if pixel0 == 0: pixel0=numpy.argmax(arctrace)
-	pixel0 = int(pixel0)
+	if len(pixel0) == 0: pixel0=[numpy.argmax(arctrace)]
+	pixel0 = [int(x) for x in pixel0]
 	if 'COEFF' in list(prior.keys()):
 		p1 = prior['COEFF']
 		wave1 = numpy.polyval(p1,numpy.arange(len(arctrace)))
 	else: 
-		p0 = [resolution,lam0-resolution*pixel0]
+		if len(lam0) == 0: raise ValueError('Problem: there is no initial estimate of central wavelength to perform wavelenth calibration')
+		elif len(lam0) == 1: p0 = [resolution,lam0[0]-resolution*pixel0[0]]
+		else: p0 = numpy.polyfit(pixel0,lam0,int(numpy.nanmin([sfit_order,len(lam0)-1])))
 		wave0 = numpy.polyval(p0,numpy.arange(len(arctrace)))
 
 # now center the strongest feature
@@ -2746,7 +2748,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 # now analyze science targets - ONLY DOING FIRST FILE
 	for src in list(redux['PARAMETERS']['SOURCE'].keys()):
 		if src not in list(redux.keys()) or reset==True or kwargs.get('reset_source',False) == True:
-			if verbose==True: print('\nExtracting spectrum of {}'.format(src))
+			if verbose==True: print('\nExtracting {} spectrum of {}'.format(redux['PARAMETERS']['MODE'],src))
 #			print(redux['PARAMETERS']['SOURCE'][src])
 			ims,hds = readKastFiles(redux['PARAMETERS']['SOURCE'][src]['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'],verbose=verbose,)
 			if len(redux['PARAMETERS']['SOURCE'][src]['FILES']) > 1:
@@ -2848,6 +2850,9 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 	Compares to spectra to each other and returns the best fit statistic and scale factor
 	Input: spectra objects
 	Output: fit stat and scale factor 
+
+	NOTE
+	provide a way of doing comparision without uncertainties
 	'''
 # make sure both spectra conform to same wave and flux units
 	sp2 = copy.deepcopy(sp2orig)
