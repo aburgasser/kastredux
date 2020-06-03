@@ -200,6 +200,7 @@ def kastHeaderValue(hdr,keyword):
 # RESOURCE DATA
 FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
 FLUXCALS = {
+	'FEIGE67': {'FILE' : 'ffeige67.dat'},
 	'FEIGE110': {'FILE' : 'ffeige110.dat'},
 	'HILTNER600': {'FILE' : 'fhilt600.dat'},
 }
@@ -2667,7 +2668,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
 		spflx.applyWaveCal(arcrecal)
 		if redux['PARAMETERS']['MODE'] == 'BLUE':
-			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,fit_range=[3700.,5300.],plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
+			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,fit_range=[3700.,5550.],plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
 		else:
 			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
 		redux['CAL_FLUX']['TRACE'] = trace
