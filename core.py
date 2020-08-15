@@ -6,9 +6,7 @@ from __future__ import print_function
 # - documentation
 # - function docstrings
 # - if output dictionary exists, won't do anything! -> can't used saved files
-# - add more dispersion options (esp. blue)
-# - error on writing fits files - INSTRUMENT keyword (shorten to INSTRUM
-#
+# - enlarge xticks yticks in output plots
 
 # imports - internal
 import copy
@@ -224,7 +222,7 @@ class Spectrum(object):
 	Includes methods for combining spectrum objects together, reading/writing, conversion
 	'''
 	def __init__(self,**kwargs):
-		core_attributes = {'instrument': 'KAST red','name': 'Unknown source','wave': [],'flux': [],'unc': [],'variance':[],'background': [],'mask': [],'header': {},}
+		core_attributes = {'instr': 'KAST red','name': 'Unknown source','wave': [],'flux': [],'unc': [],'variance':[],'background': [],'mask': [],'header': {},}
 		default_units = {'wave': DEFAULT_WAVE_UNIT,'flux':DEFAULT_FLUX_UNIT,'unc': DEFAULT_FLUX_UNIT,'background': DEFAULT_FLUX_UNIT,'variance': DEFAULT_FLUX_UNIT**2}
 
 # set inputs
@@ -249,7 +247,7 @@ class Spectrum(object):
 				pass
 # clean up
 		self.original = copy.deepcopy(self)
-		self.history = ['{} spectrum of {} successfully loaded'.format(self.instrument,self.name)]
+		self.history = ['{} spectrum of {} successfully loaded'.format(self.instr,self.name)]
 		return
 
 	def setbase(self):
@@ -315,7 +313,7 @@ class Spectrum(object):
 		'''
 		:Purpose: A simple representation of the Spectrum object
 		'''
-		return '{} spectrum of {}'.format(self.instrument,self.name)
+		return '{} spectrum of {}'.format(self.instr,self.name)
 
 	def __add__(self,other):
 		'''
@@ -1232,7 +1230,8 @@ def readKastFiles(num,folder='./',mode='',prefix='',rotate=True,verbose=ERROR_CH
 			if checkDict(mode,MODES) == False: raise ValueError('Mode {} not defined'.format(mode))
 			else: mode=checkDict(mode,MODES)	
 			prefix=MODES[mode]['PREFIX']
-		files = ['{}/{}{}.fits'.format(folder,prefix,str(n).zfill(4)) for n in nlist]
+#		files = ['{}/{}{}.fits'.format(folder,prefix,str(n).zfill(4)) for n in nlist]
+		files = ['{}/{}{}.fits'.format(folder,prefix,str(n)) for n in nlist]
 # read in files
 	for f in files:
 		if not os.path.exists(f): print('Warning: cannot find data file {}; skipping'.format(f))
@@ -2728,7 +2727,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 # apply flux calibration
 			spflx.applyFluxCal(redux['CAL_FLUX'])
 # compute telluric corection
-			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,plot_file='{}/diagnostic_telluic_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
+			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,plot_file='{}/diagnostic_telluric_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 			redux['CAL_TELL'][tstar]['NAME'] = tstar
 			redux['CAL_TELL'][tstar]['TRACE'] = trace
 			redux['CAL_TELL'][tstar]['PROFILE'] = profile
@@ -2964,11 +2963,11 @@ def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwa
 		grid = plt.GridSpec(4, 1, hspace=0, wspace=0.2)
 		ax_top = fig.add_subplot(grid[:-1,0])
 		ax_btm = fig.add_subplot(grid[-1,0])
-		ax_top.plot(wave,u1,'k--')
 		ax_top.plot(wave,f1,'k-')
 		ax_top.plot(wave,f2*scale_factor,'m-')
-		ax_top.plot(wave,numpy.zeros(len(wave)),'k:')
 		ax_top.legend([sp1.name,sp2.name],fontsize=16)
+		ax_top.plot(wave,u1,'k--')
+		ax_top.plot(wave,numpy.zeros(len(wave)),'k:')
 		ax_top.set_xlim(xlim)
 		ax_top.set_ylim(ylim)
 		ax_top.set_ylabel('Flux Density',fontsize=16)
