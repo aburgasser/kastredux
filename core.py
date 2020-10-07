@@ -1466,6 +1466,8 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 					dt[kv[0].upper().strip()] = kv[1].upper().strip()
 				if 'FILES' not in list(dt.keys()): print('Warning: FILES keyword must be included in instruction file line for {}'.format(ref))
 				else: dt['FILES'] = numberList(dt['FILES'])
+				dt['REUSE'] = False
+				if 'FILE' in list(dt.keys()): dt['REUSE'] = True
 				if 'BACK' in list(dt.keys()): 
 					dt['BACK'] = dt['BACK'].replace('[','').replace(']','').replace('(','').replace(')','').split(',')
 					dt['BACK'] = [int(x) for x in dt['BACK']]
@@ -1494,6 +1496,11 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 				if 'PIXEL' not in list(dt.keys()): raise ValueError('information list for {} requires PIXEL keyword; current lists gives {}'.format(ref,dt))
 				parameters[ref] = dt
 			else: parameters[ref] = parts[1].strip()
+
+# place holder for reusing existing calibration files
+	if 'BIAS_REUSE' in list(parameters.keys()): parameters['BIAS'] = {'FILES': '0-1'}
+	if 'FLAT_REUSE' in list(parameters.keys()): parameters['FLAT'] = {'FILES': '0-1'}
+
 	for r in required:
 		if r not in list(parameters.keys()): print('WARNING: required parameter {} not in instruction file'.format(r))
 	if 'REDUCTION_FOLDER' not in list(parameters.keys()): parameters['REDUCTION_FOLDER'] = parameters['DATA_FOLDER']+'/../reduction/'
@@ -2545,6 +2552,17 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 	if 'FLUXCAL_REUSE' in list(redux['PARAMETERS'].keys()): 
 		if os.path.exists(redux['PARAMETERS']['FLUXCAL_REUSE'])==True: cal_flux_file = redux['PARAMETERS']['FLUXCAL_REUSE']
 		elif verbose==True: print('Could not find flux calibration data {}'.format(redux['PARAMETERS']['FLUXCAL_REUSE']))
+	if 'BIAS_REUSE' in list(redux['PARAMETERS'].keys()): bias_file = redux['PARAMETERS']['BIAS_REUSE']
+		# bias_file = redux['PARAMETERS']['BIAS_REUSE']
+		# if os.path.exists(bias_file) == False: bias_file=redux['PARAMETERS']['REDUCTION_FOLDER']+'/'+bias_file
+		# if os.path.exists(bias_file) == False: 
+		# 	if verbose==True: print('\nCannot find bias file {}'.format(bias_file))
+		# 	bias_file=''
+		# else:
+		# 	if verbose==True: print('\nReading in bias frame from file {}'.format(bias_file))
+		# 	redux['BIAS'],redux['BIAS_HEADER'] = readKastFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
+	if 'FLAT_REUSE' in list(redux['PARAMETERS'].keys()): flat_file = redux['PARAMETERS']['FLAT_REUSE']
+	if 'MASK_REUSE' in list(redux['PARAMETERS'].keys()): mask_file = redux['PARAMETERS']['MASK_REUSE']
 
 # make sure necessary folders are in place
 	if os.path.exists(redux['PARAMETERS']['DATA_FOLDER']) == False: raise ValueError('Could not located data folder {}; please check the path'.format(redux['PARAMETERS']['DATA_FOLDER']))
@@ -2556,45 +2574,59 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			raise ValueError('Could not create reduction folder {}; please check the path'.format(redux['PARAMETERS']['REDUCTION_FOLDER']))
 
 # IMAGE ANALYSIS
-# read or create bias frame		
-	if 'BIAS' not in list(redux.keys()) or reset==True:
-		if bias_file!='':
-			if os.path.exists(bias_file) == False: bias_file=redux['PARAMETERS']['REDUCTION_FOLDER']+'/'+bias_file
-			if os.path.exists(bias_file) == False: bias_file=''
-		if bias_file!='' and reset==False:
+# read or create bias frame
+	if 'BIAS' not in list(redux.keys()) and bias_file!='':
+		tmp = copy.deepcopy(bias_file)
+		if os.path.exists(bias_file) == False: bias_file=redux['PARAMETERS']['REDUCTION_FOLDER']+'/'+bias_file
+		if os.path.exists(bias_file) == False: 
+			if verbose==True: print('\nCannot find bias file {} or {}'.format(tmp,bias_file))
+			bias_file=''
+		else: 
 			if verbose==True: print('\nReading in bias frame from file {}'.format(bias_file))
 			redux['BIAS'],redux['BIAS_HEADER'] = readKastFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
-		else:
-			bias_file='{}/bias_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
-			if verbose==True: print('\nReducing bias frames')
-			redux['BIAS'],redux['BIAS_HEADER'] = makeBias(redux['PARAMETERS']['BIAS']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'],output=bias_file)
+	if 'BIAS' not in list(redux.keys()) or (reset==True and 'BIAS_REUSE' not in list(redux['PARAMETERS'].keys())) or bias_file=='':
+		bias_file='{}/bias_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
+		if verbose==True: print('\nReducing bias frames')
+		redux['BIAS'],redux['BIAS_HEADER'] = makeBias(redux['PARAMETERS']['BIAS']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'],output=bias_file)
+
+	# if reset==True and 'BIAS_REUSE' not in list(redux['PARAMETERS'].keys())
+	# if 'BIAS' not in list(redux.keys()) or reset==True:
+	# 	print(reset,bias_file)
+	# 	if bias_file!='' and reset==False:
+	# 		if verbose==True: print('\nReading in bias frame from file {}'.format(bias_file))
+	# 		redux['BIAS'],redux['BIAS_HEADER'] = readKastFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
+	# 	else:
 
 # read or create flat field frame		
-	if 'FLAT' not in list(redux.keys()) or reset==True:
-		if flat_file!='':
-			if os.path.exists(flat_file) == False: flat_file=redux['PARAMETERS']['REDUCTION_FOLDER']+flat_file
-			if os.path.exists(flat_file) == False: flat_file=''
-		if flat_file!='' and reset==False:
+	if 'FLAT' not in list(redux.keys()) and flat_file!='':
+		tmp = copy.deepcopy(flat_file)
+		if os.path.exists(flat_file) == False: flat_file=redux['PARAMETERS']['REDUCTION_FOLDER']+flat_file
+		if os.path.exists(flat_file) == False: 
+			if verbose==True: print('\nCannot find flat file {} or {}'.format(tmp,flat_file))
+			flat_file=''
+		else: 
 			if verbose==True: print('\nReading in flat field frame from file {}'.format(flat_file))
 			redux['FLAT'],redux['FLAT_HEADER'] = readKastFiles(flat_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
-		else:
-			flat_file='{}/flat_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
-			if verbose==True: print('\nReducing flat field frames')
-			redux['FLAT'],redux['FLAT_HEADER'] = makeFlat(redux['PARAMETERS']['FLAT']['FILES'],redux['BIAS'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'],output=flat_file)
+	if 'FLAT' not in list(redux.keys()) or (reset==True and 'FLAT_REUSE' not in list(redux['PARAMETERS'].keys())) or flat_file=='':
+		flat_file='{}/flat_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
+		if verbose==True: print('\nReducing flat field frames')
+		redux['FLAT'],redux['FLAT_HEADER'] = makeFlat(redux['PARAMETERS']['FLAT']['FILES'],redux['BIAS'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'],output=flat_file)
 
 # read or create mask frame		
-	if 'MASK' not in list(redux.keys()) or reset==True:
-		if mask_file!='':
-			if os.path.exists(mask_file) == False: mask_file=redux['PARAMETERS']['REDUCTION_FOLDER']+mask_file
-			if os.path.exists(mask_file) == False: mask_file=''
-		if mask_file!='' and reset==False:
+	if 'MASK' not in list(redux.keys()) and mask_file!='':
+		tmp = copy.deepcopy(mask_file)
+		if os.path.exists(mask_file) == False: mask_file=redux['PARAMETERS']['REDUCTION_FOLDER']+mask_file
+		if os.path.exists(mask_file) == False: 
+			if verbose==True: print('\nCannot find mask file {} or {}'.format(tmp,mask_file))
+			mask_file=''
+		else: 
 			if verbose==True: print('\nReading in mask frame from file {}'.format(mask_file))
 			redux['MASK'],redux['MASK_HEADER'] = readKastFiles(mask_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
-		else:
-			mask_file='{}/mask_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
-			if verbose==True: print('\nGenerating mask file')
-			redux['MASK'] = makeMask(redux['BIAS'],redux['FLAT'],output=mask_file)
-			if verbose==True: print('Masking {} bad pixels'.format(int(numpy.nansum(redux['MASK']))))
+	if 'MASK' not in list(redux.keys()) or (reset==True and 'MASK_REUSE' not in list(redux['PARAMETERS'].keys())) or mask_file=='':
+		mask_file='{}/mask_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
+		if verbose==True: print('\nGenerating mask file')
+		redux['MASK'] = makeMask(redux['BIAS'],redux['FLAT'],output=mask_file)
+		if verbose==True: print('Masking {} bad pixels'.format(int(numpy.nansum(redux['MASK']))))
 
 # clean the flat
 	if verbose==True: print('\nCleaning flat frames')
@@ -2667,7 +2699,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
 		spflx.applyWaveCal(arcrecal)
 		if redux['PARAMETERS']['MODE'] == 'BLUE':
-			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,fit_range=[3700.,5550.],plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
+			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,fit_range=[3500.,5550.],plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
 		else:
 			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
 		redux['CAL_FLUX']['TRACE'] = trace
