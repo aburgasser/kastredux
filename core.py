@@ -42,7 +42,7 @@ if sys.version_info.major == 2:	 # switch for those using python 3
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2020.02.17'
+VERSION = '2020.12.20'
 __version__ = VERSION
 
 #set the CODE_PATH, either from set environment variable or from PYTHONPATH or from sys.path
@@ -568,7 +568,7 @@ class Spectrum(object):
 		if 'RMS' in list(cal_wave.keys()): self.history.append('RMS error on wavelength solution = {} {}'.format(cal_wave['RMS'],self.wave.unit))
 		return
 
-	def applyFluxCal(self,cal_flux):
+	def applyFluxCal(self,cal_flux,debug=False):
 		'''
 		Apply flux calibration
 		'''
@@ -577,12 +577,34 @@ class Spectrum(object):
 		for r in required:
 			if r not in list(cal_flux.keys()): raise ValueError('Required parameter {} not in flux calibration structure'.format(r))
 
+		if debug==True: 
+			flx_old = copy.deepcopy(self.flux)
+			print('applying flux calibration with coefficients {}'.format(cal_flux['COEFF']))
+		
 		for k in ['flux','unc','background']:
 			if k in list(self.__dict__.keys()):
 				setattr(self,k,(getattr(self,k).value)*(10.**(numpy.polyval(cal_flux['COEFF'],self.wave.value)))*cal_flux['UNIT'])
+			else: 
+				if debug==True: print('cannot find parameter {} in spectrum'.format(k))
 		self.variance = self.unc**2
 		self.history.append('Flux calibration applied')
 		if 'NAME' in list(cal_flux.keys()): self.history.append('Flux calibrator {} used'.format(cal_flux['NAME']))
+
+		if debug==True:
+			plt.plot(self.wave.value,self.flux.value,'m-')
+			plt.plot(self.wave.value,flx_old.value*numpy.nanmedian(self.flux.value)/numpy.nanmedian(flx_old.value),'b-')
+			plt.legend(['Corrected Spectrum','Prior Spectrum'])
+			plt.xticks(fontsize=16)
+			plt.yticks(fontsize=16)
+			plt.xlim([numpy.nanmin(self.wave.value),numpy.nanmax(self.wave.value)])
+			plt.ylim([0,numpy.nanquantile(self.flux.value,0.9)*1.2])
+			plt.xlabel('Wavelength (Ang)',fontsize=16)
+			plt.ylabel('Apparent Flux density ({})'.format(self.flux.unit),fontsize=16)
+			plt.tight_layout()
+			plt.savefig('debug.pdf')
+			plt.close()
+			raise ValueError('check debug.pdf')
+
 		return
 
 	def applyTelluricCal(self,cal_tell):
@@ -1486,6 +1508,7 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 					dt['BACK'] = dt['BACK'].replace('[','').replace(']','').replace('(','').replace(')','').split(',')
 					dt['BACK'] = [int(x) for x in dt['BACK']]
 				if 'WINDOW' in list(dt.keys()): dt['WINDOW'] = int(dt['WINDOW'])
+				if ref=='TELLURIC' and 'SPT' not in list(dt.keys()): dt['SPT'] = 'G2V'
 				parameters[ref][dt['NAME']] = dt
 			elif ref in ['WAVE_INITIAL']:
 				dt = {}				
@@ -2384,20 +2407,33 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 #		plt.clf()
 	return cal_flux
 
-def telluricCalibrate(tellsp,fitrange=[6200,8800],fit_order=5,fitcycle=10,sclip=3.,plot_file='',verbose=ERROR_CHECKING):
+def telluricCalibrate(tellsp,fitrange=[6000,9150],fit_order=5,fitcycle=10,sclip=3.,type='G2',plot_file='',verbose=ERROR_CHECKING):
 	'''
 	Uses spectrum of telluric calibrator to determine corrections to telluric absorption
+	Note: this is ONLY for the red
 	Input: telluric cal spectrum, spectral type
 	Output: dictionary containing telluric absorption correction, fit diagnostics
 	'''
-# regions of strong telluric absorption	
-	tranges = [[5800,6000],[6250,6340],[6440,6620],[6850,6960],[7160,7350],[7580,7700],[8100,8350]]
-# regions of G/A star line absorption	
-	glines = [[3636,3656],[3960,3980],[4092,4112],[4330,4350],[4851,4871],[6553,6573],[8194,8214],[8480,8550],[8648,8668],[9536,9566]]
 
+# regions of strong telluric & absorption	
+	tranges = [[5800,6000],[6230,6340],[6850,7050],[7140,7350],[7580,7700],[8080,8360],[8920,9200],[9250,9800]]
+# regions of G/A star line absorption	
+	glines = [[6548,6578]]
+	if 'A' in type.upper():
+		tranges = [[5800,6000],[6230,6340],[6850,7050],[7140,7350],[7580,7700],[8080,8360],[9050,9200],[9250,9800]]
+		glines = [[6535,6593],[8194,8214],[8480,8550],[8571,8621],[8638,8688],[8718,8778],[8830,8890],[8992,9032],[9196,9256],[9526,9576]]
 # mask out telluric and star lines to get fit of continuum
-	wv = tellsp.wave.value
+	wv = tellsp.wave.value	
 	flx = tellsp.flux.value
+
+# quick exit if spectrum is outside telluric fit range (e.g., for Blue)
+	if numpy.nanmax(wv) < numpy.nanmin(fitrange): 
+		cal_tell = {}
+		cal_tell['WAVE'] = wv
+		cal_tell['CORRECTION'] = numpy.ones(len(wv))
+		return cal_tell
+
+# mask and fit continuum
 	mask = numpy.zeros(len(wv))
 	mask[numpy.isnan(flx)==True] = 1
 	mask[flx<=0] = 1
@@ -2421,8 +2457,13 @@ def telluricCalibrate(tellsp,fitrange=[6200,8800],fit_order=5,fitcycle=10,sclip=
 	correction = numpy.ones(len(wv))
 	tmask = numpy.zeros(len(wv))
 	for t in tranges: tmask[numpy.logical_and(wv>=t[0],wv<=t[1])]=1
+#	for t in glines: tmask[numpy.logical_and(wv>=t[0],wv<=t[1])]=0
 	if numpy.nansum(tmask)>0:
 		correction[numpy.logical_and(tmask==1,flx>0)] = continuum[numpy.logical_and(tmask==1,flx>0)]/flx[numpy.logical_and(tmask==1,flx>0)]
+
+# outside fitrange no correction
+	correction[wv>numpy.nanmax(fitrange)]=1
+	correction[wv<numpy.nanmin(fitrange)]=1
 
 # generate reporting structure	
 	cal_tell = {}
@@ -2436,9 +2477,9 @@ def telluricCalibrate(tellsp,fitrange=[6200,8800],fit_order=5,fitcycle=10,sclip=
 		plt.figure(figsize=[8,8])
 		plt.subplot(211)
 		plt.plot(wv,flx,'k-',alpha=0.5)
-		plt.plot(wv[mask==0],flx[mask==0],'b-',)
-		plt.plot(wv[mask==0],continuum[mask==0],'m-')
-		plt.legend(['Observed','Masked','Continuum'])
+		plt.plot(wv[tmask==0],flx[tmask==0],'b-',)
+		plt.plot(wv,continuum,'m-')
+		plt.legend(['Observed','Stellar','Continuum'])
 		plt.xticks(fontsize=16)
 		plt.yticks(fontsize=16)
 		plt.xlabel('Wavelength (Ang)',fontsize=16)
@@ -2625,7 +2666,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 	if 'MASK' not in list(redux.keys()) or (reset==True and 'MASK_REUSE' not in list(redux['PARAMETERS'].keys())) or mask_file=='':
 		mask_file='{}/mask_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
 		if verbose==True: print('\nGenerating mask file')
-		redux['MASK'] = makeMask(redux['BIAS'],redux['FLAT'],output=mask_file)
+		redux['MASK'] = makeMask(redux['BIAS'],redux['FLAT'],mode=redux['PARAMETERS']['MODE'],output=mask_file)
 		if verbose==True: print('Masking {} bad pixels'.format(int(numpy.nansum(redux['MASK']))))
 
 # clean the flat
@@ -2757,9 +2798,10 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			spflx.applyWaveCal(arcrecal)
 #			spflx.applyWaveCal(redux['CAL_WAVE'])
 # apply flux calibration
-			spflx.applyFluxCal(redux['CAL_FLUX'])
+			spflx.applyFluxCal(redux['CAL_FLUX'],debug=False)
 # compute telluric corection
-			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,plot_file='{}/diagnostic_telluric_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
+#			print(tstar,redux['PARAMETERS']['TELLURIC'][tstar]['SPT'])
+			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,type=redux['PARAMETERS']['TELLURIC'][tstar]['SPT'],plot_file='{}/diagnostic_telluric_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 			redux['CAL_TELL'][tstar]['NAME'] = tstar
 			redux['CAL_TELL'][tstar]['TRACE'] = trace
 			redux['CAL_TELL'][tstar]['PROFILE'] = profile
@@ -2869,7 +2911,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 	pickle.dump(redux,f)
 	f.close()
 
-	return redux
+	return
 
 
 ############################################################
@@ -2968,7 +3010,7 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 
 	return stat, scale_factor
 
-def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwargs):
+def compareSpectra_simple(sp1,sp2orig,fit_range=[],exclude_range=[],plot=False,plot_file='',**kwargs):
 	'''
 	A stripped down version of compareSpectra() to address errors 
 	'''
@@ -2985,6 +3027,8 @@ def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwa
 	if len(fit_range)>1:
 		weights[wave<numpy.nanmin(fit_range)]=0
 		weights[wave>numpy.nanmax(fit_range)]=0
+	if len(exclude_range)>1:
+		weights[numpy.logical_and(wave>numpy.nanmin(exclude_range),wave<numpy.nanmax(exclude_range))]=0
 	scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*f2*f2/vtot)
 	stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
 	if plot==True: 
@@ -3012,6 +3056,11 @@ def compareSpectra_simple(sp1,sp2orig,fit_range=[],plot=False,plot_file='',**kwa
 		ax_btm.set_ylim([-3.*numpy.nanmedian(u1),3.*numpy.nanmedian(u1)])
 		ax_btm.set_xlabel('Wavelength (Angstrom)',fontsize=16)
 		ax_btm.set_ylabel('O-C',fontsize=16)
+		wv = wave[weights==0]
+		if len(wv)>0:
+			for w in wv: 
+				ax_top.plot(ylim,[w,w],c='grey',ls='-',alpha=0.3)
+				ax_btm.plot([-3.*numpy.nanmedian(u1),3.*numpy.nanmedian(u1)],[w,w],c='grey',ls='-',alpha=0.3)
 
 # 		fig,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
 # 		ax1.plot(wave,f1,c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
