@@ -3,6 +3,8 @@ from __future__ import print_function
 
 # WORKING COPY OF KAST REDUCTION CODE
 # THINGS THAT NEED FIXING
+# - flux calibration isn't quite right - not returning a G star to a G star (esp in blue)
+# - fix flux calibration "wiggle" at red end of blue dispersion
 # - documentation
 # - function docstrings
 # - if output dictionary exists, won't do anything! -> can't used saved files
@@ -2407,7 +2409,7 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 #		plt.clf()
 	return cal_flux
 
-def telluricCalibrate(tellsp,fitrange=[6000,9150],fit_order=5,fitcycle=10,sclip=3.,type='G2',plot_file='',verbose=ERROR_CHECKING):
+def telluricCalibrate(tellsp,fitrange=[6000,8900],fit_order=4,fitcycle=10,sclip=3.,type='G2',plot_file='',verbose=ERROR_CHECKING):
 	'''
 	Uses spectrum of telluric calibrator to determine corrections to telluric absorption
 	Note: this is ONLY for the red
