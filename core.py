@@ -44,7 +44,7 @@ if sys.version_info.major == 2:	 # switch for those using python 3
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2020.12.20'
+VERSION = '2021.05.16'
 __version__ = VERSION
 
 #set the CODE_PATH, either from set environment variable or from PYTHONPATH or from sys.path
@@ -70,6 +70,32 @@ if CODE_PATH == '':
 if CODE_PATH == '':
 	print('Warning: could not set CODE_PATH variable from PYTHONPATH or system PATH environmental variables; some functionality may not work')
 	CODE_PATH = './'
+
+############################################################
+# RESOURCE DATA
+############################################################
+
+FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
+FLUXCALS = {
+	'FEIGE66': {'FILE' : 'ffeige66.dat'},
+	'FEIGE67': {'FILE' : 'ffeige67.dat'},
+	'FEIGE110': {'FILE' : 'ffeige110.dat'},
+	'HILTNER600': {'FILE' : 'fhilt600.dat'},
+}
+
+SPTSTDFOLDER = CODE_PATH+'/resources/spectral_standards/'
+SPTSTDS = {}
+PLOT_DEFAULTS = {'figsize': [6,4], 'fontsize': 16,
+'color': 'k', 'ls': '-', 'alpha': 1, 
+'background_color': 'grey', 'background_ls': '--', 'background_alpha': 1,
+'comparison_color': 'm', 'comparison_ls': '--', 'comparison_alpha': 1,
+'unc_color': 'grey', 'unc_ls': '--', 'unc_alpha': 1,
+'zero_color': 'k', 'zero_ls': '--', 'zero_alpha': 1,
+}
+
+TELLSTDFOLDER = CODE_PATH+'/resources/telluric_standards/'
+
+ERROR_CHECKING = True
 
 
 ############################################################
@@ -116,6 +142,7 @@ CCD_PARAMETERS = {
 	'BLUE-FAST': {'GAIN': 1.3, 'RN': 6.5},
 	'BLUE-SLOW': {'GAIN': 1.2, 'RN': 3.8},
 }
+
 
 # extract image mode from image header
 def kastRBMode(hdr,keyword='VERSION'):
@@ -196,27 +223,10 @@ def kastHeaderValue(hdr,keyword):
 		raise ValueError('Cannot find keyword {} in header or header lookup table'.format(keyword))
 
 
-
-# RESOURCE DATA
-FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
-FLUXCALS = {
-	'FEIGE67': {'FILE' : 'ffeige67.dat'},
-	'FEIGE110': {'FILE' : 'ffeige110.dat'},
-	'HILTNER600': {'FILE' : 'fhilt600.dat'},
-}
-SPTSTDFOLDER = CODE_PATH+'/resources/spectral_standards/'
-SPTSTDS = {}
-PLOT_DEFAULTS = {'figsize': [6,4], 'fontsize': 16,
-'color': 'k', 'ls': '-', 'alpha': 1, 
-'background_color': 'grey', 'background_ls': '--', 'background_alpha': 1,
-'comparison_color': 'm', 'comparison_ls': '--', 'comparison_alpha': 1,
-'unc_color': 'grey', 'unc_ls': '--', 'unc_alpha': 1,
-'zero_color': 'k', 'zero_ls': '--', 'zero_alpha': 1,
-}
-ERROR_CHECKING = True
-
-
+############################################################
 # SPECTRUM CLASS
+############################################################
+
 class Spectrum(object):
 	'''
 	Container for spectrum object
@@ -486,6 +496,7 @@ class Spectrum(object):
 		for k in ['flux','background']:
 			fself = interp1d(self.wave.value,getattr(self,k).value,bounds_error=False,fill_value=0.)
 			fother = interp1d(other.wave.value,getattr(other,k).value,bounds_error=False,fill_value=0.)
+# NOTE: THERE IS A PERSISTENT ERROR HERE
 			setattr(out,k,numpy.divide(fself(out.wave.value),fother(out.wave.value))*(getattr(self,k).unit)/(getattr(other,k).unit))
 			if k=='flux': flxs,flxo = fself,fother
 # special for variance
@@ -547,15 +558,34 @@ class Spectrum(object):
 
 	def smooth(self,scale,method='median'):
 		'''
-		Do a boxcar smooth
+		Apply a smoothing profile
+		currently this is hanning or median
 		'''
-		xsamp = numpy.arange(0,len(self.wave)-scale,scale)
-		self.wave = numpy.array([self.wave.value[x+int(0.5*scale)] for x in xsamp])*self.wave.unit
-		for k in ['flux','unc','background']:
-			setattr(self,k,numpy.array([numpy.nanmedian(getattr(self,k).value[x:x+scale]) for x in xsamp])*getattr(self,k).unit)
+		# smoothing function
+		if method=='hanning': 
+			smwin = signal.windows.hann(scale)
+			for k in ['flux','unc','background']:
+				setattr(self,k,(signal.convolve(getattr(self,k).value,smwin,mode='same')/numpy.sum(smwin))*getattr(self,k).unit)
+
+		elif method=='median':
+			xsamp = numpy.arange(0,len(self.wave)-scale+1,scale)
+#			self.wave = numpy.array([self.wave.value[x+int(0.5*scale)] for x in xsamp])*self.wave.unit
+			for k in ['flux','unc','background']:
+				repl = []
+				for x in xsamp: 
+					if len(repl)<len(self.flux.value):
+						repl.extend([numpy.nanmedian(getattr(self,k).value[x:x+scale])]*scale)
+				setattr(self,k,numpy.array(repl)*getattr(self,k).unit)
+#			setattr(self,k,numpy.array([numpy.nanmedian(getattr(self,k).value[x:x+scale]) for x in xsamp])*getattr(self,k).unit)
+		else:
+			print('Warning: cannot smooth using method {}, no change to spectrum'.format(method))
+			return
+
 		self.variance = self.unc**2
-		self.history.append('Smoothed by a scale of {} pixels'.format(scale))
-	
+		self.history.append('Smoothed by {} using a scale of {} pixels'.format(method,scale))
+		return
+
+
 	def applyWaveCal(self,cal_wave):
 		'''
 		Apply wavelength calibration
@@ -570,7 +600,7 @@ class Spectrum(object):
 		if 'RMS' in list(cal_wave.keys()): self.history.append('RMS error on wavelength solution = {} {}'.format(cal_wave['RMS'],self.wave.unit))
 		return
 
-	def applyFluxCal(self,cal_flux,debug=False):
+	def applyFluxCal(self,cal_flux,log=True,debug=False):
 		'''
 		Apply flux calibration
 		'''
@@ -585,7 +615,10 @@ class Spectrum(object):
 		
 		for k in ['flux','unc','background']:
 			if k in list(self.__dict__.keys()):
-				setattr(self,k,(getattr(self,k).value)*(10.**(numpy.polyval(cal_flux['COEFF'],self.wave.value)))*cal_flux['UNIT'])
+				if log==True:
+					setattr(self,k,(getattr(self,k).value)*(10.**(numpy.polyval(cal_flux['COEFF'],self.wave.value)))*cal_flux['UNIT'])
+				else:
+					setattr(self,k,(getattr(self,k).value)*numpy.polyval(cal_flux['COEFF'],self.wave.value)*cal_flux['UNIT'])
 			else: 
 				if debug==True: print('cannot find parameter {} in spectrum'.format(k))
 		self.variance = self.unc**2
@@ -1483,7 +1516,7 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 				parameters[ref] = parts[1].upper().strip()
 				if checkDict(parameters[ref],MODES) == False: raise ValueError('Mode {} not defined'.format(parameters[ref]))
 				else: parameters[ref]=checkDict(parameters[ref],MODES)
-			elif ref in ['BIAS','FLAT','ARC','ARC_SHALLOW','ARC_DEEP','FLUXCAL']:
+			elif ref in ['BIAS','FLAT','ARC','ARC_SHALLOW','ARC_DEEP']:
 				dt = {}
 				for p in parts[1:]:
 					kv = p.split('=')
@@ -1496,8 +1529,9 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 					dt['BACK'] = dt['BACK'].replace('[','').replace(']','').replace('(','').replace(')','').split(',')
 					dt['BACK'] = [int(x) for x in dt['BACK']]
 				if 'WINDOW' in list(dt.keys()): dt['WINDOW'] = int(dt['WINDOW'])
+				if 'METHOD' not in list(dt.keys()): dt['METHOD'] = 'optimal'
 				parameters[ref] = dt
-			elif ref in ['SOURCE','TELLURIC']:
+			elif ref in ['SOURCE','TELLURIC','FLUXCAL']:
 				if ref not in (parameters.keys()): parameters[ref] = {}
 				dt = {}				
 				for p in parts[1:]:
@@ -1510,6 +1544,7 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 					dt['BACK'] = dt['BACK'].replace('[','').replace(']','').replace('(','').replace(')','').split(',')
 					dt['BACK'] = [int(x) for x in dt['BACK']]
 				if 'WINDOW' in list(dt.keys()): dt['WINDOW'] = int(dt['WINDOW'])
+				if 'METHOD' not in list(dt.keys()): dt['METHOD'] = 'optimal'
 				if ref=='TELLURIC' and 'SPT' not in list(dt.keys()): dt['SPT'] = 'G2V'
 				parameters[ref][dt['NAME']] = dt
 			elif ref in ['WAVE_INITIAL']:
@@ -1993,17 +2028,22 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 #	trc = [int(t) for t in trace]
 
 # some method presets
-	if method=='arc':
+#	if verbose==True: print('input profile length =  {}'.format(len(profile)))
+	if method.lower()=='arc':
 		subtract_background = False
-	if method=='optimal' and len(profile)==0:
+	if method.lower()=='optimal' and len(profile)==0:
 		profile = spatialProfile(im,cntr=cntr,window=src_wnd)
-	if method=='boxcar' or len(profile)==0:
+	elif method.lower()=='boxcar' or len(profile)==0:
+		profile = numpy.ones(2*src_wnd+1)
+	else:
+		if verbose==True: print('Extraction method {} unrecognized; using boxcar'.format(method))
 		profile = numpy.ones(2*src_wnd+1)
 # force agreement between source window and extraction profile so profile can be used as input
 	if len(profile)>(2*src_wnd+1): 
 		profile = profile[int(0.5*(len(profile)-1)-src_wnd):int(0.5*(len(profile)-1)+src_wnd+1)]
 	if len(profile)<(2*src_wnd+1): 
 		src_wnd = int(0.5*(len(profile)-1))
+	if verbose==True: print('Using extraction method {}'.format(method))
 
 # compute background and subtract from extraction region
 	bck = []
@@ -2043,6 +2083,7 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 		if numpy.nansum(prf)==0.: prf = copy.deepcopy(profile)
 # extract fluxes & uncertainties - not entirely sure about the variance calculation...
 		flx.append(numpy.nansum(src*prf)/numpy.nansum(prf))
+# NOTE: THERE IS A PERSISTENT ERROR HERE
 		unc.append((numpy.nansum(vsrc*prf)**0.5)/numpy.nansum(prf))
 	flx = numpy.array(flx)
 	unc = numpy.array(unc)
@@ -2059,7 +2100,7 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 		plt.figure(figsize=[8,15])
 		plt.subplot(511)
 		slc = numpy.nanmedian(im,axis=1)
-		slc = slc-numpy.nanmin(slc)
+		slc = slc-numpy.nanmedian(slc)
 		slc = slc/numpy.nanmax(slc)
 		# xslc = numpy.arange(len(slc))+cntr-2*bck_wnd[1]
 		# xref = int(numpy.nanmedian(x))
@@ -2070,6 +2111,14 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 		plt.plot(numpy.arange(len(slc)),slc,'k-',alpha=0.5)
 		plt.plot(numpy.arange(len(profile))+cntr-0.5*(len(profile)-1),profile,'b-')
 		plt.legend(['Spatial Profile','Extraction Profile'])
+		slc[:int(cntr-0.5*(len(profile)-1))] = numpy.nan
+		slc[int(cntr+0.5*(len(profile)-1))] = numpy.nan
+		slc = slc/numpy.nanmax(slc)
+		plt.plot(numpy.arange(len(slc)),slc,'m-',alpha=0.5)
+		# slcpc = slc[int(cntr-0.5*(len(profile)-1)):int(cntr+0.5*(len(profile)))]
+		# slcpcx = slc[int(cntr-0.5*(len(profile)-1)):int(cntr+0.5*(len(profile)))]
+		# slcpc = slcpc/numpy.nanmax(slcpc)
+		# plt.plot(numpy.arange(len(slcpc))+cntr-0.5*(len(slcpc)-1),slcpc,'m-')
 #		plt.plot(xslc[int(2*bck_wnd[1]-src_wnd):int(2*bck_wnd[1]+src_wnd)],slc[int(2*bck_wnd[1]-src_wnd):int(2*bck_wnd[1]+src_wnd)],'k-')
 #		plt.plot(xslc[bck_wnd[1]:int(2*bck_wnd[1]-bck_wnd[0])],slc[bck_wnd[1]:int(2*bck_wnd[1]-bck_wnd[0])],'m-')
 #		plt.plot(xslc[int(2*bck_wnd[1]+bck_wnd[0]):int(3*bck_wnd[1])],slc[int(2*bck_wnd[1]+bck_wnd[0]):int(3*bck_wnd[1])],'m-')
@@ -2118,6 +2167,8 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 		plt.imshow(imsub,vmin=numpy.nanmedian(imsub)-3.*numpy.nanstd(imsub),vmax=numpy.nanmedian(imsub)+3.*numpy.nanstd(imsub))
 		plt.xticks(fontsize=16)
 		plt.yticks(fontsize=16)
+		plt.xlabel('Pixel',fontsize=16)
+		plt.ylabel('Pixel',fontsize=16)
 
 		plt.tight_layout()
 		try:
@@ -2385,6 +2436,7 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 		plt.legend(['Ratio','RMS={:.2f} dex'.format(numpy.nanstd(diff)),'Fit'])
 		plt.xticks(fontsize=16)
 		plt.yticks(fontsize=16)
+		plt.xlim([numpy.nanmin(fluxsp.wave.value),numpy.nanmax(fluxsp.wave.value)])
 		plt.xlabel('Wavelength (Ang)',fontsize=16)
 		plt.ylabel('Calibrator/Observed',fontsize=16)
 		plt.subplot(212)
@@ -2409,7 +2461,138 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 #		plt.clf()
 	return cal_flux
 
-def telluricCalibrate(tellsp,fitrange=[6000,8900],fit_order=4,fitcycle=10,sclip=3.,type='G2',plot_file='',verbose=ERROR_CHECKING):
+
+def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,sclip=3.,smooth=5,fit_range=[],calfolder=TELLSTDFOLDER,stdfile='',plot_file='',verbose=ERROR_CHECKING):
+	'''
+	Uses spectrum of telluric calibrator to determine a second-order flux calibration correction
+	Input: telluric cal spectrum, spt
+	Output: dictionary containing  observed to physical flux correction, fit diagnostics
+
+	TODO
+	need to add wavelength shift around H lines, and smooth data and model to same resolution
+	'''
+
+	tspt = copy.deepcopy(spt).upper()
+	if tspt[-1] != 'V': tspt=tspt+'V'
+
+	cal_reflux = {}
+	cal_reflux['SPT'] = tspt
+	cal_reflux['UNIT'] = u.dimensionless_unscaled
+
+	wv = tellsp.wave.value	
+	flx = tellsp.flux.value
+	mask = numpy.zeros(len(wv))
+
+# establish fit range
+# quick exit if spectrum is outside fit range
+	if len(fit_range) == 0: fit_range = [numpy.nanmin(tellsp.wave.value),numpy.nanmax(tellsp.wave.value)]
+	if numpy.nanmax(wv) < numpy.nanmin(fit_range) or numpy.nanmin(wv) > numpy.nanmax(fit_range): 
+		if verbose==True: print('Fit range {} is outside spectral range {}'.format(fit_range,[numpy.nanmin(wv),numpy.nanmax(wv)]))
+		cal_reflux['COEFF'] = [1.]
+		cal_reflux['MASK'] = mask
+		cal_reflux['WAVE'] = wv
+		cal_reflux['CORRECTION'] = numpy.ones(len(wv))
+		return cal_reflux
+
+# spectral standards - currently only A0V and G2V
+	stdfile = calfolder+'{}_pickles1998.txt'.format(tspt)
+	# stds = {
+	# 	'A0': calfolder+'A00_SDSS-kesseli2017.txt',
+	# 	'G2': calfolder+'G20_SDSS-kesseli2017.txt',
+	# }
+
+	# stdfile = ''
+	# for k in list(stds.keys()):
+		# if (spt.upper())[:2] in k: stdfile = stds[k]
+	# if stdfile=='':
+	if os.path.exists(stdfile)==False:
+		# if verbose==True: print('Telluric spectral type {} is not among of current telluric standard spectra: {}'.format(spt,list(stds.keys())))
+		if verbose==True: print('Telluric spectral type {} or calibration file {} is not among of current telluric standards in {}; no change made'.format(spt,'{}_pickles1998.txt'.format(tspt),calfolder))
+		cal_reflux['COEFF'] = [1.]
+		cal_reflux['MASK'] = mask
+		cal_reflux['WAVE'] = wv
+		cal_reflux['CORRECTION'] = numpy.ones(len(wv))
+		return cal_reflux
+	fcal = readSpectrum(stdfile,flux_unit=tellsp.flux.unit,wave_unit=tellsp.wave.unit)
+
+# compute, normalize, and smooth ratio of observed telluric to calibrator telluric
+	ratio = tellsp/fcal
+	calscalefactor = numpy.nanmedian(ratio.flux.value)
+	ratio.scale(1./calscalefactor)
+	ratio.smooth(smooth)
+
+# regions of strong telluric absorption	
+	tranges = [[5800,6000],[6230,6340],[6850,7050],[7140,7350],[7580,7700],[8080,8360],[8920,9800]]
+# regions of G/A star line absorption	
+	glines = [[6548,6578]]
+	if 'A' in spt.upper():
+		tranges = [[5800,6000],[6230,6340],[6850,7050],[7140,7350],[7580,7700],[8080,8360],[9050,9800]]
+		glines = [[6535,6593],[8194,8214],[8480,8550],[8571,8621],[8638,8688],[8718,8778],[8830,8890],[8992,9032],[9196,9256],[9526,9576]]
+
+# define mask
+	mask[numpy.isnan(flx)==True] = 1
+	mask[ratio.flux.value<0] = 1
+	mask[numpy.isfinite(ratio.flux.value)==False] = 1
+	for t in tranges: mask[numpy.logical_and(wv>=t[0],wv<=t[1])]=1
+#	for t in glines: mask[numpy.logical_and(wv>=t[0],wv<=t[1])]=1
+	mask[numpy.logical_or(wv<fit_range[0],wv>fit_range[1])]=1
+
+# determine a flux correction in unmasked regions of ratio
+	for i in range(fit_cycle):
+		p = numpy.polyfit(ratio.wave.value[mask==0],1./ratio.flux.value[mask==0],fit_order)
+		diff = ratio.flux.value-(1./numpy.polyval(p,ratio.wave.value))
+		mask[numpy.absolute(diff)>(sclip*numpy.nanstd(diff[mask==0]))] = 1
+
+# generate interpolated correction function defaulting to 1
+	f = interp1d(ratio.wave.value[mask==0],ratio.flux.value[mask==0],bounds_error=False,fill_value=1.)
+	correction = 1./f(wv)
+
+# generate reporting structure	
+	cal_reflux['COEFF'] = p
+	cal_reflux['MASK'] = mask
+	cal_reflux['WAVE'] = wv
+	cal_reflux['CORRECTION'] = correction
+
+# plot results
+	if plot_file!='':
+		xlim = [numpy.nanmin(tellsp.wave.value),numpy.nanmax(tellsp.wave.value)]
+		plt.clf()
+		plt.figure(figsize=[8,8])
+		plt.subplot(211)
+		plt.plot(ratio.wave.value,ratio.flux.value,'k-',alpha=0.5)
+		plt.plot(ratio.wave.value[mask==0],ratio.flux.value[mask==0],'k-')
+		plt.plot(wv,1./correction,'m-')
+		plt.plot(wv,1./numpy.polyval(p,wv),'m--')
+		plt.legend(['Ratio','RMS={:.2f} dex'.format(numpy.nanstd(diff)),'Correction','Fit'])
+		plt.plot(xlim,[1,1],'k--')
+		plt.xticks(fontsize=16)
+		plt.yticks(fontsize=16)
+		plt.xlim(xlim)
+		plt.xlabel('Wavelength (Ang)',fontsize=16)
+		plt.ylabel('Standard/Observed',fontsize=16)
+		plt.subplot(212)
+#		yrng=[0,1.2]
+		plt.plot(fcal.wave.value,fcal.flux.value*calscalefactor,'k-')
+		plt.plot(tellsp.wave.value,tellsp.flux.value,'b-')
+		plt.plot(tellsp.wave.value,tellsp.flux.value*numpy.polyval(p,tellsp.wave.value),'m-')
+		plt.legend(['{} Calibration Spectrum'.format(spt),'Observed Telluric Spectrum (scaled)','Corrected Telluric Spectrum'])
+		plt.xticks(fontsize=16)
+		plt.yticks(fontsize=16)
+		plt.xlim(xlim)
+		plt.ylim([0,numpy.nanquantile(tellsp.flux.value,0.9)*1.2])
+		plt.xlabel('Wavelength (Ang)',fontsize=16)
+		plt.ylabel('Apparent Flux density ({})'.format(tellsp.flux.unit),fontsize=16)
+		plt.tight_layout()
+		try:
+			plt.savefig(plot_file)
+			plt.close()
+		except:
+			print('Warning: could not save flux calibration diagnostics to file {}'.format(plot_file))
+
+	return cal_reflux
+
+
+def telluricCalibrate(tellsp,fit_range=[6000,9200],fit_order=4,fitcycle=10,sclip=3.,spt='G2',plot_file='',verbose=ERROR_CHECKING):
 	'''
 	Uses spectrum of telluric calibrator to determine corrections to telluric absorption
 	Note: this is ONLY for the red
@@ -2418,18 +2601,18 @@ def telluricCalibrate(tellsp,fitrange=[6000,8900],fit_order=4,fitcycle=10,sclip=
 	'''
 
 # regions of strong telluric & absorption	
-	tranges = [[5800,6000],[6230,6340],[6850,7050],[7140,7350],[7580,7700],[8080,8360],[8920,9200],[9250,9800]]
+	tranges = [[6230,6340],[6850,7050],[7140,7350],[7580,7700],[8080,8360],[8920,9200],[9250,9800]]
 # regions of G/A star line absorption	
 	glines = [[6548,6578]]
-	if 'A' in type.upper():
-		tranges = [[5800,6000],[6230,6340],[6850,7050],[7140,7350],[7580,7700],[8080,8360],[9050,9200],[9250,9800]]
+	if 'A' in spt.upper():
+		tranges = [[6230,6340],[6850,7050],[7140,7350],[7580,7700],[8080,8360],[9050,9200],[9250,9800]]
 		glines = [[6535,6593],[8194,8214],[8480,8550],[8571,8621],[8638,8688],[8718,8778],[8830,8890],[8992,9032],[9196,9256],[9526,9576]]
 # mask out telluric and star lines to get fit of continuum
 	wv = tellsp.wave.value	
 	flx = tellsp.flux.value
 
 # quick exit if spectrum is outside telluric fit range (e.g., for Blue)
-	if numpy.nanmax(wv) < numpy.nanmin(fitrange): 
+	if numpy.nanmax(wv) < numpy.nanmin(fit_range): 
 		cal_tell = {}
 		cal_tell['WAVE'] = wv
 		cal_tell['CORRECTION'] = numpy.ones(len(wv))
@@ -2444,7 +2627,7 @@ def telluricCalibrate(tellsp,fitrange=[6000,8900],fit_order=4,fitcycle=10,sclip=
 #	print(len(mask),numpy.nansum(mask))
 	for t in glines: mask[numpy.logical_and(wv>=t[0],wv<=t[1])]=1
 #	print(len(mask),numpy.nansum(mask))
-	mask[numpy.logical_or(wv<fitrange[0],wv>fitrange[1])]=1
+	mask[numpy.logical_or(wv<fit_range[0],wv>fit_range[1])]=1
 	fmask = copy.deepcopy(mask)
 	#plt.plot(wv[msk==0],flx[msk==0])
 	for i in range(fitcycle):
@@ -2459,13 +2642,13 @@ def telluricCalibrate(tellsp,fitrange=[6000,8900],fit_order=4,fitcycle=10,sclip=
 	correction = numpy.ones(len(wv))
 	tmask = numpy.zeros(len(wv))
 	for t in tranges: tmask[numpy.logical_and(wv>=t[0],wv<=t[1])]=1
-#	for t in glines: tmask[numpy.logical_and(wv>=t[0],wv<=t[1])]=0
+	for t in glines: tmask[numpy.logical_and(wv>=t[0],wv<=t[1])]=0
 	if numpy.nansum(tmask)>0:
 		correction[numpy.logical_and(tmask==1,flx>0)] = continuum[numpy.logical_and(tmask==1,flx>0)]/flx[numpy.logical_and(tmask==1,flx>0)]
 
-# outside fitrange no correction
-	correction[wv>numpy.nanmax(fitrange)]=1
-	correction[wv<numpy.nanmin(fitrange)]=1
+# outside fit_range no correction
+	correction[wv>numpy.nanmax(fit_range)]=1
+	correction[wv<numpy.nanmin(fit_range)]=1
 
 # generate reporting structure	
 	cal_tell = {}
@@ -2481,7 +2664,7 @@ def telluricCalibrate(tellsp,fitrange=[6000,8900],fit_order=4,fitcycle=10,sclip=
 		plt.plot(wv,flx,'k-',alpha=0.5)
 		plt.plot(wv[tmask==0],flx[tmask==0],'b-',)
 		plt.plot(wv,continuum,'m-')
-		plt.legend(['Observed','Stellar','Continuum'])
+		plt.legend(['Observed','Stellar ({})'.format(spt),'Continuum'])
 		plt.xticks(fontsize=16)
 		plt.yticks(fontsize=16)
 		plt.xlabel('Wavelength (Ang)',fontsize=16)
@@ -2563,12 +2746,21 @@ def profileCheck(instructions='',cntr=335,verbose=ERROR_CHECKING,trace_slice=[25
 	if len(trace_slice)==0: trace_slice = [150,len(im[0,:])-150]
 
 # now do abbreviated "peak check" and plot out results
-	for src in list(parameters['SOURCE'].keys()):
-		if verbose==True: print('Checking spatial profile of {}'.format(src))
-		im,hd = readKastFiles(parameters['SOURCE'][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
-		if 'CENTER' in list(parameters['SOURCE'][src].keys()): cntr = int(parameters['SOURCE'][src]['CENTER'])
-		cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src,parameters['MODE']))
-		if verbose==True: print('Best center = {}'.format(cntr))
+	for k in ['SOURCE','TELLURIC','FLUXCAL']:
+	# for src in list(parameters['SOURCE'].keys()):
+	# 	if verbose==True: print('Checking spatial profile of {}'.format(src))
+	# 	im,hd = readKastFiles(parameters['SOURCE'][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
+	# 	if 'CENTER' in list(parameters['SOURCE'][src].keys()): cntr = int(parameters['SOURCE'][src]['CENTER'])
+	# 	cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src,parameters['MODE']))
+	# 	if verbose==True: print('Best center = {}'.format(cntr))
+
+		if len(list(parameters[k].keys()))>0:
+			for src in list(parameters[k].keys()):
+				if verbose==True: print('Checking spatial profile of {}'.format(src))
+				im,hd = readKastFiles(parameters[k][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
+				if 'CENTER' in list(parameters[k][src].keys()): cntr = int(parameters[k][src]['CENTER'])
+				cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src,parameters['MODE']))
+				if verbose==True: print('Best center = {}'.format(cntr))
 
 	return
 
@@ -2669,7 +2861,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		mask_file='{}/mask_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
 		if verbose==True: print('\nGenerating mask file')
 		redux['MASK'] = makeMask(redux['BIAS'],redux['FLAT'],mode=redux['PARAMETERS']['MODE'],output=mask_file)
-		if verbose==True: print('Masking {} bad pixels'.format(int(numpy.nansum(redux['MASK']))))
+		if verbose==True: print('Masking {} bad pixels ({:.0f}%)'.format(int(numpy.nansum(redux['MASK'])),100.*numpy.nansum(redux['MASK'])/redux['MASK'].size))
 
 # clean the flat
 	if verbose==True: print('\nCleaning flat frames')
@@ -2710,56 +2902,58 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		try: redux['CAL_FLUX'] = pickle.load(open(cal_flux_file,'rb'))
 		except: print('WARNING: could not read in prior flux calibration structure from {}'.format(cal_flux_file))
 	if ('CAL_FLUX' not in list(redux.keys()) or reset==True or kwargs.get('reset_fluxcal',False) == True) and 'FLUXCAL' in list(redux['PARAMETERS'].keys()):
-		if verbose==True: print('\nAnalyzing flux calibrator {}'.format(redux['PARAMETERS']['FLUXCAL']['NAME']))
-		ims,hds = readKastFiles(redux['PARAMETERS']['FLUXCAL']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
-		if len(redux['PARAMETERS']['FLUXCAL']['FILES']) > 1:
+		ref = list(redux['PARAMETERS']['FLUXCAL'].keys())[0]
+		if verbose==True: print('\nAnalyzing flux calibrator {}'.format(ref))
+		ims,hds = readKastFiles(redux['PARAMETERS']['FLUXCAL'][ref]['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
+		if len(redux['PARAMETERS']['FLUXCAL'][ref]['FILES']) > 1:
 			im,hd = crRejectCombine(ims,verbose=verbose),hds[0]
 		else: im,hd = ims,hds
 # some parameters
+		cntr=-1
+		if 'CENTER' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): cntr = int(redux['PARAMETERS']['FLUXCAL'][ref]['CENTER'])
 		src_wnd = copy.deepcopy(src_wnd0)
-		if 'WINDOW' in list(redux['PARAMETERS']['FLUXCAL'].keys()): src_wnd = redux['PARAMETERS']['FLUXCAL']['WINDOW']
+		if 'WINDOW' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): src_wnd = redux['PARAMETERS']['FLUXCAL'][ref]['WINDOW']
 		bck_wnd = copy.deepcopy(bck_wnd0)
-		if 'BACK' in list(redux['PARAMETERS']['FLUXCAL'].keys()): bck_wnd = redux['PARAMETERS']['FLUXCAL']['BACK']
+		if 'BACK' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): bck_wnd = redux['PARAMETERS']['FLUXCAL'][ref]['BACK']
 		fit_order = copy.deepcopy(fit_order0)
-		if 'FIT_ORDER' in list(redux['PARAMETERS']['FLUXCAL'].keys()): fit_order = redux['PARAMETERS']['FLUXCAL']['FIT_ORDER']
+		if 'FIT_ORDER' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): fit_order = redux['PARAMETERS']['FLUXCAL'][ref]['FIT_ORDER']
 # reduce data, determine trace and extract spectrum
-#def reduceScienceImage(image, bias, flat, mask=[], hd={}, mode='', rdmode='', gain=0., rn=0., exposure='EXPTIME', mask_image=True, folder='./', verbose=ERROR_CHECKING):
 		imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd=hd)
-		cntr = findPeak(imr)
-		trace = traceDispersion(imr,cntr=cntr,window=src_wnd,method='maximum',plot_file='{}/diagnostic_trace_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
+		cntr = findPeak(imr,cntr=cntr)
+		trace = traceDispersion(imr,cntr=cntr,window=src_wnd,method='maximum',plot_file='{}/diagnostic_trace_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['MODE']))
 		imrect = rectify(imr,trace)
 		varrect = rectify(var,trace)
 		maskrect = rectify(redux['MASK'],trace)
-		cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
+		cntr = findPeak(imrect,cntr=cntr,window=src_wnd,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['MODE']))
 #		profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
-		profile = numpy.ones(int(2*src_wnd+1))
-		spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
-		spflx.name = redux['PARAMETERS']['FLUXCAL']['NAME']
+#		profile = numpy.ones(int(2*src_wnd+1))
+		spflx = extractSpectrum(imrect,cntr=cntr,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,method=redux['PARAMETERS']['FLUXCAL'][ref]['METHOD'],plot_file='{}/diagnostic_extraction_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['MODE']))
+		spflx.name = redux['PARAMETERS']['FLUXCAL'][ref]['NAME']
 		spflx.header = hd
 #		spflx = extractSpectrum(imr,var,mask=redux['MASK'],trace=trace,src_wnd=10)
 		arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 		arcrect = rectify(arcdp,trace)
-		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['MODE']))
+		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['MODE']))
 		spflx.applyWaveCal(arcrecal)
 		if redux['PARAMETERS']['MODE'] == 'BLUE':
-			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,fit_range=[3500.,5550.],plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
+			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],fit_order=fit_order,fit_range=[3500.,5550.],plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
 		else:
-			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL']['NAME'],fit_order=fit_order,plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
+			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],fit_order=fit_order,plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
 		redux['CAL_FLUX']['TRACE'] = trace
-		redux['CAL_FLUX']['PROFILE'] = profile
-		spflx.applyFluxCal(redux['CAL_FLUX'])
-		redux[redux['PARAMETERS']['FLUXCAL']['NAME']] = spflx
+#		redux['CAL_FLUX']['PROFILE'] = profile
+		spflx.applyFluxCal(redux['CAL_FLUX'],log=True)
+		redux[redux['PARAMETERS']['FLUXCAL'][ref]['NAME']] = spflx
 # save this to pickle file
 		f = open('{}/cal_flux_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']),'wb')
 		pickle.dump(redux['CAL_FLUX'],f)
 		f.close()
 # plot  and save
 		fig = spflx.plot(ylim=[0,1.2*numpy.quantile(spflx.flux.value,0.95)])
-		fig.figure.savefig('{}/kast{}_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['DATE']))
+		fig.figure.savefig('{}/kast{}_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['DATE']))
 		plt.close()
 #		plt.clf()
-		spflx.toFile('{}/kast{}_{}_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['DATE']))
-		spflx.toFile('{}/kast{}_{}_{}.txt'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],redux['PARAMETERS']['FLUXCAL']['NAME'],redux['PARAMETERS']['DATE']))
+		spflx.toFile('{}/kast{}_{}_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['DATE']))
+		spflx.toFile('{}/kast{}_{}_{}.txt'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['DATE']))
 
 # determine telluric calibrations
 	if ('CAL_TELL' not in list(redux.keys()) or reset==True or kwargs.get('reset_tellcal',False) == True) and 'TELLURIC' in list(redux['PARAMETERS'].keys()):
@@ -2770,6 +2964,8 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			if len(redux['PARAMETERS']['TELLURIC'][tstar]['FILES']) > 1: im,hd = crRejectCombine(ims,verbose=verbose),hds[0]
 			else: im,hd = ims,hds
 # some parameters
+			cntr=-1
+			if 'CENTER' in list(redux['PARAMETERS']['TELLURIC'][tstar].keys()): cntr = int(redux['PARAMETERS']['TELLURIC'][tstar]['CENTER'])
 			src_wnd = copy.deepcopy(src_wnd0)
 			if 'WINDOW' in list(redux['PARAMETERS']['TELLURIC'][tstar].keys()): src_wnd = redux['PARAMETERS']['TELLURIC'][tstar]['WINDOW']
 			bck_wnd = copy.deepcopy(bck_wnd0)
@@ -2778,18 +2974,18 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd=hd)
 #			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd['EXPTIME'])
 # trace source and rectify
-			cntr = findPeak(imr)
+			cntr = findPeak(imr,cntr=cntr)
 			trace = traceDispersion(imr,cntr=cntr,window=src_wnd,method='maximum',plot_file='{}/diagnostic_trace_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 			imrect = rectify(imr,trace)
 			varrect = rectify(var,trace)
 			maskrect = rectify(redux['MASK'],trace)
 # find center
-			cntr = findPeak(imrect,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
+			cntr = findPeak(imrect,cntr=cntr,window=src_wnd,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 # make profile
 #			profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
-			profile = numpy.ones(int(2*src_wnd+1))
+#			profile = numpy.ones(int(2*src_wnd+1))
 # extract spectrum
-			spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
+			spflx = extractSpectrum(imrect,cntr=cntr,var=varrect,mask=maskrect,src_wnd=src_wnd,bck_wnd=bck_wnd,method=redux['PARAMETERS']['TELLURIC'][tstar]['METHOD'],plot_file='{}/diagnostic_extraction_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 			spflx.name = tstar
 			spflx.header = hd
 # reidentify arc lines
@@ -2800,13 +2996,13 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			spflx.applyWaveCal(arcrecal)
 #			spflx.applyWaveCal(redux['CAL_WAVE'])
 # apply flux calibration
-			spflx.applyFluxCal(redux['CAL_FLUX'],debug=False)
+			spflx.applyFluxCal(redux['CAL_FLUX'],debug=False,log=True)
 # compute telluric corection
 #			print(tstar,redux['PARAMETERS']['TELLURIC'][tstar]['SPT'])
-			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,type=redux['PARAMETERS']['TELLURIC'][tstar]['SPT'],plot_file='{}/diagnostic_telluric_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
+			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,spt=redux['PARAMETERS']['TELLURIC'][tstar]['SPT'],plot_file='{}/diagnostic_telluric_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 			redux['CAL_TELL'][tstar]['NAME'] = tstar
 			redux['CAL_TELL'][tstar]['TRACE'] = trace
-			redux['CAL_TELL'][tstar]['PROFILE'] = profile
+#			redux['CAL_TELL'][tstar]['PROFILE'] = profile
 #			spflx.applyTelluricCal(redux['CAL_TELL'][tstar])
 			redux[tstar] = spflx
 # save this to pickle file
@@ -2820,6 +3016,17 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 #			plt.clf()
 			spflx.toFile('{}/kast{}_{}_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],tstar,redux['PARAMETERS']['DATE']))
 			spflx.toFile('{}/kast{}_{}_{}.txt'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'],tstar,redux['PARAMETERS']['DATE']))
+
+# determine second-order flux corrections from telluric standards
+	if ('CAL_REFLUX' not in list(redux.keys()) or reset==True or kwargs.get('reset_fluxrecal',False) == True) and 'TELLURIC' in list(redux['PARAMETERS'].keys()) and redux['PARAMETERS']['MODE'] != 'BLUE':
+		if verbose==True: print('\nComputing second order flux corrections from telluric standards')
+		redux['CAL_REFLUX'] = {}
+		for tstar in list(redux['PARAMETERS']['TELLURIC'].keys()):
+			redux['CAL_REFLUX'][tstar] = fluxReCalibrate(redux[tstar],spt=redux['PARAMETERS']['TELLURIC'][tstar]['SPT'],plot_file='{}/diagnostic_reflux_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
+# save this to pickle file
+			f = open('{}/cal_reflux_{}_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']),'wb')
+			pickle.dump(redux['CAL_REFLUX'][tstar],f)
+			f.close()
 
 # now analyze science targets - ONLY DOING FIRST FILE
 	for src in list(redux['PARAMETERS']['SOURCE'].keys()):
@@ -2851,16 +3058,16 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 				print('found new center {}'.format(cntr))
 			tcorr,ttrace = False,False
 			if 'TELLURIC' in list(redux['PARAMETERS']['SOURCE'][src].keys()): 
-				tcorr,ttrace = True,True
+				tcorr,ttrace,reflux = True,True,True
 				tstar = redux['PARAMETERS']['SOURCE'][src]['TELLURIC']
 			if 'APPLY_TRACE' in list(redux['PARAMETERS']['SOURCE'][src].keys()) and tcorr==True: 
 				ttrace = redux['PARAMETERS']['SOURCE'][src]['APPLY_TRACE'].upper()=='TRUE'
 			cflag = True
 			if 'RECENTER' in list(redux['PARAMETERS']['SOURCE'][src].keys()): 
 				cflag = redux['PARAMETERS']['SOURCE'][src]['RECENTER'].upper()=='TRUE'
-			pflag = 'SOURCE'
-			if 'PROFILE' in list(redux['PARAMETERS']['SOURCE'][src].keys()): 
-				pflag = redux['PARAMETERS']['SOURCE'][src]['PROFILE'].upper()
+			# pflag = 'SOURCE'
+			# if 'PROFILE' in list(redux['PARAMETERS']['SOURCE'][src].keys()): 
+			# 	pflag = redux['PARAMETERS']['SOURCE'][src]['PROFILE'].upper()
 # trace source or apply input trace
 			if ttrace==False: 
 				if verbose==True: print('Tracing science target'.format(src))
@@ -2876,16 +3083,19 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 				cntr = findPeak(imrect,cntr=cntr,window=src_wnd,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src,redux['PARAMETERS']['MODE']))
 				if verbose==True: print('Recentered source to {}'.format(cntr))
 # choose profile and extract
-			if pflag.upper()=='SOURCE': 
-				if verbose==True: print('Using spatial profile measured from source')
-				profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
-			elif pflag.upper()=='TELLURIC' and tcorr==True: 
-				if verbose==True: print('Using spatial profile measured from telluric standard {}'.format(tstar))
-				profile = redux['CAL_TELL'][tstar]['PROFILE']
-			else: 
-				if verbose==True: print('Using flat spatial profile')
-				profile = numpy.ones(int(2*src_wnd+1))
-			spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,cntr=cntr,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,plot_file='{}/diagnostic_extraction_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src,redux['PARAMETERS']['MODE']))
+			profile = []
+			# if pflag.upper()=='SOURCE': 
+			# 	if verbose==True: print('Using spatial profile measured from source')
+			# 	profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
+			if 'PROFILE' in list(redux['PARAMETERS']['SOURCE'][src].keys()): 
+				if redux['PARAMETERS']['SOURCE'][src]['PROFILE'].upper() == 'TELLURIC' and tcorr==True:
+					profile = redux['CAL_TELL'][tstar]['PROFILE']
+			# if pflag.upper()=='TELLURIC' and tcorr==True: 
+			# 	if verbose==True: print('Using spatial profile measured from telluric standard {}'.format(tstar))
+			# else: 
+			# 	if verbose==True: print('Using flat spatial profile')
+			# 	profile = numpy.ones(int(2*src_wnd+1))
+			spflx = extractSpectrum(imrect,var=varrect,mask=maskrect,cntr=cntr,src_wnd=src_wnd,bck_wnd=bck_wnd,profile=profile,method=redux['PARAMETERS']['SOURCE'][src]['METHOD'],plot_file='{}/diagnostic_extraction_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src,redux['PARAMETERS']['MODE']))
 			spflx.name = src
 			spflx.header = hd
 # reapply arc solution
@@ -2894,10 +3104,20 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src,redux['PARAMETERS']['MODE']))
 			spflx.applyWaveCal(arcrecal)
 # apply flux calibration
-			if 'CAL_FLUX' in list(redux.keys()): spflx.applyFluxCal(redux['CAL_FLUX'])
+			if 'CAL_FLUX' in list(redux.keys()): 
+				print('Applying flux calibration')
+				spflx.applyFluxCal(redux['CAL_FLUX'],log=True)
 			else: print('Warning: no flux calibration applied')
+# apply second order flux calibration
+# note: could also do this with wave and correction keywords with applyTelluricCal
+			if 'CAL_REFLUX' in list(redux.keys()) and 'TELLURIC' in list(redux['PARAMETERS']['SOURCE'][src].keys()): 
+				print('Applying second-order flux calibration from {}'.format(tstar))
+				spflx.applyFluxCal(redux['CAL_REFLUX'][tstar],log=False)
+			else: print('Warning: no second order flux calibration applied')
 # apply telluric correction
-			if tcorr==True: spflx.applyTelluricCal(redux['CAL_TELL'][tstar])
+			if tcorr==True: 
+				print('Applying telluric correction from {}'.format(tstar))				
+				spflx.applyTelluricCal(redux['CAL_TELL'][tstar])
 			else: print('Warning: no telluric correction applied')
 			redux[src] = spflx
 # plot and export spectrum
@@ -3012,6 +3232,8 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 
 	return stat, scale_factor
 
+
+
 def compareSpectra_simple(sp1,sp2orig,fit_range=[],exclude_range=[],plot=False,plot_file='',**kwargs):
 	'''
 	A stripped down version of compareSpectra() to address errors 
@@ -3115,13 +3337,78 @@ def stitchOrders():
 	'''
 	pass
 
-def classifyTemplate():
+def initializeStandards(spt,sdss=True,folder=SPTSTDFOLDER,reset=False,sd=False,esd=False,usd=False,beta=False,giant=False,gamma=False,verbose=False):
+	'''
+	Read spectral standards into standards structure
+	'''
+	if isinstance(spt,list) == False: spt = [spt]
+	if isinstance(spt[0],float) == True or isinstance(spt[0],int) == True: 
+		if len(spt) == 2: spt = numpy.arange(spt[0],spt[1]+1)
+		spt = [typeToNum(s) for s in spt] 
+
+	if sd==True and 'sd' not in spt[0]: spt = ['sd'+s for s in spt]
+	if esd==True and 'esd' not in spt[0]: spt = ['esd'+s for s in spt]
+	if usd==True and 'usd' not in spt[0]: spt = ['usd'+s for s in spt]
+	if beta==True and 'b' not in spt[0]: spt = [s+'b' for s in spt]
+	if gamma==True and 'g' not in spt[0]: spt = [s+'g' for s in spt]
+	if giant==True and 'I' not in spt[0]: spt = [s+'I' for s in spt]
+
+	for s in spt:
+		if s not in list(SPTSTDS.keys()) or reset==True:
+			f = numpy.array(glob.glob('{}/{}*.txt'.format(folder,s.replace('.',''))))
+			if len(f) > 1:
+				if sdss==True and len(f[['SDSS' in x for x in f]])>0: f = f[['SDSS' in x for x in f]]
+# for subdwarfs
+				elif (sd==True or esd==True or usd==True) and len(f[['lepine2007' in x for x in f]])>0: 
+#					print(len(f))
+					f = f[['lepine2007' in x for x in f]]
+				else: pass
+			if len(f) > 0:
+				SPTSTDS[s] = readSpectrum(f[0],name='{} STD'.format(s))
+			else: 
+				if verbose==True: print('Warning: cannot find a spectral standard for type {}'.format(s))
+	return
+
+def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6800,8800],verbose=ERROR_CHECKING,**kwargs):
+	'''
+	Classification program using templates from resource library
+	this is a simplified version of program
+	'''
+	if not isinstance(spec,Spectrum): raise('classifyTemplate requires a kastredux Spectrum object as an input')
+	if not isinstance(spt,list): spt = [spt]
+	if len(spt)==1: spt = spt*2
+	if len(spt)==2: initializeStandards(spt)
+
+	sts = []
+	stds = list(SPTSTDS.keys())
+	for s in stds:
+		st,scl = compareSpectra_simple(spec,SPTSTDS[s],fit_range=fit_range,plot=False,**kwargs)
+		sts.append(st)
+	spt = stds[numpy.argmin(sts)]
+	if plot_file != '': st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,plot=True,plot_file=plot_file)
+	else: st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,plot=False)
+
+	return spt
+
+def classifyIndices(spec,set='',verbose=ERROR_CHECKING):
+	'''
+	Classification program using spectral indices
+	TBD
+	'''
 	pass
 
-def classifyIndices():
+def EW(spec,linewv,continuum=[],verbose=ERROR_CHECKING):
+	'''
+	Program to measure spectral equivalent width
+	TBD
+	'''
 	pass
 
-def EW():
+def EWset(spec,set='',verbose=ERROR_CHECKING):
+	'''
+	Program to measure spectral equivalent widths from a pre-defined set
+	TBD
+	'''
 	pass
 
 
