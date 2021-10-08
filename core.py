@@ -44,8 +44,9 @@ if sys.version_info.major == 2:	 # switch for those using python 3
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2021.05.16'
+VERSION = '2021.10.07'
 __version__ = VERSION
+GITHUB_URL = 'https://github.com/aburgasser/kastredux/'
 
 #set the CODE_PATH, either from set environment variable or from PYTHONPATH or from sys.path
 CODE_PATH = ''
@@ -72,6 +73,18 @@ if CODE_PATH == '':
 	CODE_PATH = './'
 
 ############################################################
+# WELCOME!
+############################################################
+
+print('\n\nWelcome to the KASTredux reduction package!')
+print('This package was developed by Adam Burgasser (aburgasser@ucsd.edu)')
+print('You are currently using version {}'.format(VERSION))
+#print('If you make use of any features of this toolkit for your research, please remember to cite the SPLAT paper:')
+#print('\n{}; Bibcode: {}\n'.format(CITATION,BIBCODE))
+print('If you make use of any spectra or models in this package, please remember to cite the original source.')
+print('Please report any errors are feature requests to our github page, {}\n\n'.format(GITHUB_URL))
+
+############################################################
 # RESOURCE DATA
 ############################################################
 
@@ -81,6 +94,7 @@ FLUXCALS = {
 	'FEIGE67': {'FILE' : 'ffeige67.dat'},
 	'FEIGE110': {'FILE' : 'ffeige110.dat'},
 	'HILTNER600': {'FILE' : 'fhilt600.dat'},
+	'LTT7987': {'FILE' : 'fltt7987.dat'},
 }
 
 SPTSTDFOLDER = CODE_PATH+'/resources/spectral_standards/'
@@ -105,10 +119,12 @@ ERROR_CHECKING = True
 DEFAULT_WAVE_UNIT = u.Angstrom
 DEFAULT_FLUX_UNIT = u.erg/u.cm/u.cm/u.Angstrom/u.s
 
-MODES = {
-	'RED': {'PREFIX': 'r', 'ALTNAME': ['r','rd','long','ir','nir'], 'NAME': 'KAST red', 'VERSION': 'kastr'},
-	'BLUE': {'PREFIX': 'b', 'ALTNAME': ['b','bl','short','uv','vis'], 'NAME': 'KAST blue', 'VERSION': 'kastb'},
+INSTRUMENT_MODES = {
+	'RED': {'PREFIX': 'r', 'SUFFIX': '', 'ALTNAME': ['kast-red','r','rd','long','ir','nir'], 'NAME': 'KAST red', 'VERSION': 'kastr', 'ROTATE': True, 'TRIM': [],},
+	'BLUE': {'PREFIX': 'b', 'SUFFIX': '', 'ALTNAME': ['kast-blue','b','bl','short','uv','vis'], 'NAME': 'KAST blue', 'VERSION': 'kastb', 'ROTATE': False, 'TRIM': [],},
+	'LDSS3': {'PREFIX': 'ccd', 'SUFFIX': 'c1', 'ALTNAME': ['ldss-3','ldss-3c'], 'NAME': 'LDSS-3', 'VERSION': '', 'ROTATE': True, 'TRIM': [],},
 }
+
 DISPERSIONS = {
 	'452/3306': {'MODE': 'BLUE', 'RESOLUTION': 1.41, 'LAM0': 5460.74},
 	'600/3000': {'MODE': 'RED', 'RESOLUTION': 1.29, 'LAM0': 5460.74},
@@ -120,9 +136,57 @@ DISPERSIONS = {
 	'830/8460': {'MODE': 'RED', 'RESOLUTION': 0.94, 'LAM0': 7032.41},
 	'300/4230': {'MODE': 'RED', 'RESOLUTION': 2.53, 'LAM0': 7032.41},
 	'300/7500': {'MODE': 'RED', 'RESOLUTION': 2.53, 'LAM0': 7032.41},
+	'VPH-RED': {'MODE': 'LDSS3', 'RESOLUTION': 1.18, 'LAM0': 9122.95},
 }
-# assumes slow read
+
 CCD_HEADER_KEYWORDS = {
+	'RED': {
+		'MODE': 'VERSION', # kastr = red, kastb = blue
+		'SLIT': 'SLIT_N',
+		'DISPERSER': 'GRATNG_N',
+		'DATE-OBS': 'DATE-OBS',
+		'OBSERVER': 'OBSERVER',
+		'OBJECT': 'OBJECT',
+		'RA': 'RA',
+		'DEC': 'DEC',
+		'HA': 'HA',
+		'AIRMASS': 'AIRMASS',
+		'EXPTIME': 'EXPTIME',
+	},
+	'BLUE': {
+		'MODE': 'VERSION', # kastr = red, kastb = blue
+		'SLIT': 'SLIT_N',
+		'DISPERSER': 'GRISM_N',
+		'DATE-OBS': 'DATE-OBS',
+		'OBSERVER': 'OBSERVER',
+		'OBJECT': 'OBJECT',
+		'RA': 'RA',
+		'DEC': 'DEC',
+		'HA': 'HA',
+		'AIRMASS': 'AIRMASS',
+		'EXPTIME': 'EXPTIME',
+	},
+	'LDSS3': {
+		'MODE': 'INSTRUME',
+		'SLIT': 'APERTURE',
+		'DISPERSER': 'GRISM',
+		'SPEED': 'SPEED',
+		'GAIN': 'EGAIN',
+		'RN': 'ENOISE',
+		'DATE-OBS': 'DATE-OBS',
+		'TIME-OBS': 'TIME-OBS',
+		'OBSERVER': 'OBSERVER',
+		'OBJECT': 'OBJECT',
+		'RA': 'RA',
+		'DEC': 'DEC',
+		'HA': 'HA',
+		'AIRMASS': 'AIRMASS',
+		'EXPTIME': 'EXPTIME',
+	},
+}
+
+# these will be replaced with the above merged dictionary
+KAST_CCD_HEADER_KEYWORDS = {
 	'MODE': 'VERSION', # kastr = red, kastb = blue
 	'GRISM': 'GRISM_N',
 	'BLUE_DISPERSION': 'GRISM_N',
@@ -136,11 +200,32 @@ CCD_HEADER_KEYWORDS = {
 	'DATE-OBS': 'DATE-OBS',
 	'EXPTIME': 'EXPTIME',
 }
+
+LDSS3_CCD_HEADER_KEYWORDS = {
+	'MODE': 'INSTRUME',
+	'SLIT': 'APERTURE',
+	'DISPERSER': 'GRISM',
+	'SPEED': 'SPEED',
+	'GAIN': 'EGAIN',
+	'RN': 'ENOISE',
+	'DATE-OBS': 'DATE-OBS',
+	'TIME-OBS': 'TIME-OBS',
+	'OBSERVER': 'OBSERVER',
+	'OBJECT': 'OBJECT',
+	'RA': 'RA',
+	'DEC': 'DEC',
+	'HA': 'HA',
+	'AIRMASS': 'AIRMASS',
+	'EXPTIME': 'EXPTIME',
+}
+
 CCD_PARAMETERS = {
 	'RED-FAST': {'GAIN': 0.55, 'RN': 4.3},
 	'RED-SLOW': {'GAIN': 1.9, 'RN': 3.7},
 	'BLUE-FAST': {'GAIN': 1.3, 'RN': 6.5},
 	'BLUE-SLOW': {'GAIN': 1.2, 'RN': 3.8},
+	'LDSS3-SLOW': {'GAIN': 0.13, 'RN': 5.3},
+	'LDSS3-FAST': {'GAIN': 1.45, 'RN': 7.2},
 }
 
 
@@ -150,8 +235,8 @@ def kastRBMode(hdr,keyword='VERSION'):
 		raise ValueError('Header does not contain red/blue mode keyword {}'.format(keyword))
 	md = hdr[keyword].strip()
 	mode = ''
-	for r in list(MODES.keys()):
-		if MODES[r]['VERSION'] == md: mode=r
+	for r in list(INSTRUMENT_MODES.keys()):
+		if INSTRUMENT_MODES[r]['VERSION'] == md: mode=r
 	if mode=='': raise ValueError('Could not identify spectral image mode from keyword {}'.format(keyword))
 	return mode
 
@@ -217,8 +302,8 @@ def kastDispersion(hdr,keyword_mode='VERSION',keyword_blue_dispersion='GRISM_N',
 def kastHeaderValue(hdr,keyword):
 	if keyword in list(hdr.keys()): return hdr[keyword]
 	elif keyword.upper() in list(hdr.keys()): return hdr[keyword.upper()]
-	elif keyword in list(CCD_HEADER_KEYWORDS.keys()): return hdr[CCD_HEADER_KEYWORDS[keyword]]
-	elif keyword.upper() in list(CCD_HEADER_KEYWORDS.keys()): return hdr[CCD_HEADER_KEYWORDS[keyword.upper()]]
+	elif keyword in list(KAST_CCD_HEADER_KEYWORDS.keys()): return hdr[KAST_CCD_HEADER_KEYWORDS[keyword]]
+	elif keyword.upper() in list(KAST_CCD_HEADER_KEYWORDS.keys()): return hdr[KAST_CCD_HEADER_KEYWORDS[keyword.upper()]]
 	else:
 		raise ValueError('Cannot find keyword {} in header or header lookup table'.format(keyword))
 
@@ -748,7 +833,7 @@ class Spectrum(object):
 			data = numpy.vstack(output)
 			hdu = fits.PrimaryHDU(data)
 			for k in list(self.header.keys()):
-				if k.upper() not in ['HISTORY','COMMENT','BITPIX','NAXIS','NAXIS1','NAXIS2','EXTEND'] and k.replace('#','') != '': # and k not in list(hdu.header.keys()):
+				if k.upper() not in ['SIMPLE','HISTORY','COMMENT','BITPIX','NAXIS','NAXIS1','NAXIS2','EXTEND'] and k.replace('#','') != '': # and k not in list(hdu.header.keys()):
 					hdu.header[k] = str(self.header[k])
 			for k in list(self.__dict__.keys()):
 				if isinstance(getattr(self,k),str) == True or isinstance(getattr(self,k),int) == True or isinstance(getattr(self,k),bool) == True or (isinstance(getattr(self,k),float) == True and numpy.isnan(getattr(self,k)) == False):
@@ -902,6 +987,120 @@ def isNumber(s):
 	except:
 		return False
 	
+
+
+def makeLog(folder,output='log.csv',prefix='',suffix='',mode='RED',sort='DATETIME'):
+	"""
+	Generates a log dynamically from the original fits files and outputs to a csv, tsv, or excel file
+
+	Parameters
+	----------
+	folder : str
+		The full path to the folder containing the data
+
+	output : str, default = 'log.csv'
+		The filename for the output log file, which should include the full path. 
+		The format of the file is determined by the file suffix, with three recognized options:
+			* `.csv`: comma-delimited file
+			* `.txt` or `.tsv`: tab-delimited file
+			* `.htm` or `.html`: html file
+			* `.tex`: latex table file
+			* `.xls` or `.xslx`: excel-style file
+
+	prefix : str, default = ''
+		Prefix for data files; if not provided, pre-populated with instrument defaults
+
+	suffix : str, default = ''
+		Suffix for data files; if not provided, pre-populated with instrument defaults
+
+	mode : str, default = 'kast'
+		Instrument/mode that acquired data; currently red, blue, and ldss3 are recognized
+
+	sort : str, default = 'DATETIME'
+		Parameter to sort the log file by. The default variable `DATETIME` sorts by a combination of DATE-OBS and TIME-OBS
+
+	Returns
+	-------
+	pandas Dataframe
+		Dataframe for log; also written to file specified by `output` parameter
+
+	Examples
+	--------
+		Here's an example that generates separate log files for red and blue data and writes these to html tables
+
+		>>> import kastredux as kr
+		>>> log_red = kr.makeLog('/data/kast/200108/data/',output='/data/kast/200108/log_red.html',mode='RED')
+		>>> log_blue = kr.makeLog('/data/kast/200108/data/',output='/data/kast/200108/log_blue.html',mode='BLUE')
+		>>> log_read.head()
+					File	DATE-OBS	OBJECT	RA	DEC	HA	AIRMASS	EXPTIME	SLIT	DISPERSER	Note	TIME-OBS
+		... 0	r1001.fits	2020-01-08	Arcs	23:34:15.67	37:15:31.6	00:00:04.55	1	3	0.5 arcsec	600/7500		00:33:07.37
+		... 1	r1002.fits	2020-01-08	Arcs	23:35:10.74	37:15:31.4	00:00:04.55	1	30	0.5 arcsec	600/7500		00:33:35.64
+		... 2	r1003.fits	2020-01-08	Bias	23:36:56.11	37:15:31.1	00:00:04.55	1	0	0.5 arcsec	600/7500		00:35:47.68
+		... 3	r1004.fits	2020-01-08	Bias	23:37:31.15	37:15:31.0	00:00:04.55	1	0	0.5 arcsec	600/7500		00:36:26.59
+		... 4	r1005.fits	2020-01-08	Bias	23:38:01.19	37:15:30.9	00:00:04.55	1	0	0.5 arcsec	600/7500		00:36:54.36
+
+"""
+# check for data
+	if os.path.isdir(folder) == False: 
+		print('Cannot find folder {}; no log created'.format(folder))
+		return
+
+# check instrument
+	mode = checkDict(mode,INSTRUMENT_MODES)
+	if mode == False: raise ValueError('Do not recognize instrument {}; use RED, BLUE or LDSS3'.format(instrument))
+	hdkey = CCD_HEADER_KEYWORDS[mode]
+
+# check files
+	if prefix=='': prefix = INSTRUMENT_MODES[mode]['PREFIX']
+	if suffix=='': suffix = INSTRUMENT_MODES[mode]['SUFFIX']
+	files = glob.glob('{}/{}*{}.fits'.format(folder,prefix,suffix))
+	if len(files) == 0: 
+		print('Cannot find any {}*{}.fits data files in {}; no log created'.format(prefix,suffix,folder))
+		return
+
+# set up data frame
+	dp = pandas.DataFrame()
+	dp['File'] = [f.split('/')[-1] for f in files]
+
+# fill in key log parameters
+	logkeys = ['DATE-OBS','TIME-OBS','OBJECT','RA','DEC','HA','AIRMASS','EXPTIME','SLIT','DISPERSER']
+	for c in logkeys: 
+		if c in list(hdkey.keys()): dp[c] = ['']*len(files)
+	dp['Note'] = ['']*len(files)
+	for i,f in enumerate(files):
+	    hdu = fits.open(f)
+	    hdu.verify('silentfix')
+	    h = hdu[0].header
+	    hdu.close()
+	    for c in logkeys: 
+	    	if c in list(hdkey.keys()): dp.loc[i,c] = h[hdkey[c]]
+
+# for kast data, TIME-OBS is created from DATE-OBS
+	if mode=='RED' or mode=='BLUE':
+		dp['TIME-OBS'] = ['']*len(files)
+		for i,date in enumerate(dp['DATE-OBS']):
+			d,t = date.split('T')
+			dp.loc[i,'DATE-OBS'] = d
+			dp.loc[i,'TIME-OBS'] = t
+
+# sort entries
+	if sort in list(dp.columns): 
+		dp.sort_values(sort,inplace=True)
+		dp.reset_index(inplace=True,drop=True)
+	if sort=='DATETIME':
+		dp['DT'] = dp['DATE-OBS']+dp['TIME-OBS']		
+		dp.sort_values('DT',inplace=True)
+		dp.reset_index(inplace=True,drop=True)
+		del dp['DT']
+
+# save file
+	if 'xls' in output.split('.')[-1]: dp.to_excel(output,index=False)	
+	elif 'csv' in output.split('.')[-1]: dp.to_csv(output,index=False)	
+	elif 'txt' in output.split('.')[-1]: dp.to_csv(output,index=False,sep='\t')
+	elif 'htm' in output.split('.')[-1]: dp.to_html(output,index=False)
+	elif 'tex' in output.split('.')[-1]: dp.to_tex(output,index=False)
+	else: raise ValueError('Could not save to output file {}; try .xslx, .csv, or .txt file formats instead'.format(output))
+	return dp
 
 def numberList(numstr,sort=False):
 	'''
@@ -1174,72 +1373,7 @@ def readSpectrum(filename,file_type='',delimiter='\s+',comment='#',columns=['wav
 
 
 
-# program to generate a log sheet
-def makeLog(folder,output='',mode='RED',verbose=ERROR_CHECKING):
-	'''
-	:Purpose:
-
-		Reads in the headers of files in a data folder and generates a log in pandas format
-
-	:Required Inputs: 
-
-		:param folder: folder for data
-
-	:Optional Inputs: 
-
-		:param output='': output file for log; can be .xlsx, .xls, .txt, .csv, .htm, .html, or .tex
-		:param mode='RED': data mode (RED or BLUE)
-
-	:Output: 
-
-		If one file number provided, a 2D numpy array containing image and dictionary containing header
-		If more than one file number provided, a 3D numpy array of [n files x n rows x n columns] and array of header dictionaries
-
-	:Usage: 
-
-		TBD
-
-	'''
-	gzflag = False
-	hdkeys = ['OBSNUM','OBJECT','OBSTYPE','EXPTIME','DATE-OBS','RA','DEC','HA','AIRMASS','GRISM_N','GRATNG_N','SLIT_N','OBSERVER','DATASEC']
-# check folder & mode	
-	if os.path.exists(folder) == False: raise ValueError('Could not find data folder {}'.format(folder))
-
-# get list of files	
-	for mode in list(MODES.keys()):
-		if checkDict(mode,MODES) == False: raise ValueError('Mode {} not defined'.format(mode))
-		else: mode=checkDict(mode,MODES)
-		files = glob.glob(folder+MODES[mode]['PREFIX']+'*.fits')
-		if len(files)==0: 
-			files = glob.glob(folder+MODES[mode]['PREFIX']+'*.gz')
-			gzflag = True
-		if len(files)==0: raise ValueError('Could not find data files {}*.fits or {}*.gz in {}'.format(MODES[mode]['PREFIX'],MODES[mode]['PREFIX'],folder))
-
-# build up header information for files
-		hd = {}
-		hd['FILE'] = [os.path.basename(f) for f in files]
-		for k in hdkeys: hd[k] = []
-# NOTE: may need to utilize gzflag here
-		for f in files:
-			hdu = fits.open(f)
-			for k in hdkeys: hd[k].append(hdu[0].header[k])
-			hdu.close()
-		dp = pandas.DataFrame(data=hd)
-		dp.sort_values('FILE',inplace=True)
-		dp.reset_index(inplace=True,drop=True)
-		if output!='':
-			ospl = output.split('.')
-			outfile = output.replace('.{}'.format(ospl[-1]),'_{}.{}'.format(mode,ospl[-1]))
-			if ospl[-1] == 'xls' or ospl[-1] == 'xlsx': dp.to_excel(outfile,index=False)
-			elif ospl[-1] == 'csv': dp.to_csv(outfile,index=False,sep=',')
-			elif ospl[-1] == 'txt': dp.to_csv(outfile,index=False,sep='\t')
-			elif ospl[-1] == 'tex': dp.to_tex(outfile,index=False)
-			elif ospl[-1] == 'html' or ospl[-1] == 'htm': dp.to_html(outfile,index=False)
-			else: print('Cannot output to file {}; skipping'.format(outfile))
-	return dp
-		
-
-def readKastFiles(num,folder='./',mode='',prefix='',rotate=True,verbose=ERROR_CHECKING):
+def readFiles(num,folder='./',mode='RED',prefix='',suffix='',rotate=False,trim=[],verbose=ERROR_CHECKING):
 	'''
 	:Purpose:
 
@@ -1267,6 +1401,7 @@ def readKastFiles(num,folder='./',mode='',prefix='',rotate=True,verbose=ERROR_CH
 # variables
 	images,hds = [],[]
 
+
 # generate list of files depending on input format	
 	nlist = copy.deepcopy(num)
 	if not isinstance(nlist,list): nlist = [num]
@@ -1281,14 +1416,23 @@ def readKastFiles(num,folder='./',mode='',prefix='',rotate=True,verbose=ERROR_CH
 				nlist = numberList(nlist[0])
 			except: 
 				raise ValueError('Could not located data files from input {}'.format(num))
+
+# generate file names from numbers using instrument defaults
 	if len(files) == 0:
-		if prefix=='': 
-			if mode=='': raise ValueError('Mode (red/blue) or file prefix must be provided')
-			if checkDict(mode,MODES) == False: raise ValueError('Mode {} not defined'.format(mode))
-			else: mode=checkDict(mode,MODES)	
-			prefix=MODES[mode]['PREFIX']
+
+# check instrument mode and set defaults
+		if checkDict(mode,INSTRUMENT_MODES) == False: 
+			print('Warning: unknown instrument mode {}'.format(mode))
+			mode = ''
+		else: 
+			mode = checkDict(mode,INSTRUMENT_MODES)
+			if prefix=='': prefix = INSTRUMENT_MODES[mode]['PREFIX']
+			if suffix=='': suffix = INSTRUMENT_MODES[mode]['SUFFIX']
+			rotate = INSTRUMENT_MODES[mode]['ROTATE']
+			trim = INSTRUMENT_MODES[mode]['TRIM']
 #		files = ['{}/{}{}.fits'.format(folder,prefix,str(n).zfill(4)) for n in nlist]
-		files = ['{}/{}{}.fits'.format(folder,prefix,str(n)) for n in nlist]
+		files = ['{}/{}{}{}.fits'.format(folder,prefix,str(n).zfill(4),suffix) for n in nlist]
+
 # read in files
 	for f in files:
 		if not os.path.exists(f): print('Warning: cannot find data file {}; skipping'.format(f))
@@ -1297,10 +1441,17 @@ def readKastFiles(num,folder='./',mode='',prefix='',rotate=True,verbose=ERROR_CH
 			im = hdulist[0].data
 			hdr = hdulist[0].header
 			hdulist.close()
+# try to infer header from file
 			if mode=='':
-				try: mode = kastRBMode(hdr)
-				except: mode='UNKNOWN'
-			if mode=='RED' and rotate==True: im = numpy.rot90(im,k=1)
+				try: 
+					mode = kastRBMode(hdr)
+					rotate = INSTRUMENT_MODES[mode]['ROTATE']
+					trim = INSTRUMENT_MODES[mode]['TRIM']
+				except: 
+					pass
+# rotate and trim
+			if rotate==True: im = numpy.rot90(im,k=1) # only one direction, may need to generalize more
+			if len(trim) > 0: im = im[trim[0]:trim[1],:]
 # subtract overscan: TBD
 #	ims = subtractOverscan(im)
 			images.append(im.astype(float))
@@ -1319,7 +1470,7 @@ def combineImages(imarr,method='median',axis=0,sclip=5.,verbose=ERROR_CHECKING,*
 
 		:param imarr: by default, a 3D array of N images, where N is length of ``axis''; 
 		alternately this can be a string specifying the file numbers or 1D array of file numbers, 
-		with images read in using readKastFiles()
+		with images read in using readFiles()
 
 	:Optional Inputs: 
 
@@ -1331,7 +1482,7 @@ def combineImages(imarr,method='median',axis=0,sclip=5.,verbose=ERROR_CHECKING,*
 		:param axis=0.: axis upon which images are combined
 		:param sclip=5.: number of standard deviations to apply signma clipping
 
-		If reading in files, additional parameters for readKastFiles() can be included though **kwargs
+		If reading in files, additional parameters for readFiles() can be included though **kwargs
 
 	:Output: 
 
@@ -1345,7 +1496,7 @@ def combineImages(imarr,method='median',axis=0,sclip=5.,verbose=ERROR_CHECKING,*
 	images = copy.deepcopy(imarr)
 	if isinstance(imarr,str) or len(numpy.shape(imarr))==1:
 		try: 
-			images,hds = readKastFiles(imarr,**kwargs)
+			images,hds = readFiles(imarr,**kwargs)
 		except: 
 			raise ValueError('Cannot process image input {}'.format(imarr))
 	if len(numpy.shape(images))==2:
@@ -1514,8 +1665,8 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 			ref = parts[0].upper().strip()
 			if ref=='MODE': 
 				parameters[ref] = parts[1].upper().strip()
-				if checkDict(parameters[ref],MODES) == False: raise ValueError('Mode {} not defined'.format(parameters[ref]))
-				else: parameters[ref]=checkDict(parameters[ref],MODES)
+				if checkDict(parameters[ref],INSTRUMENT_MODES) == False: raise ValueError('Mode {} not defined'.format(parameters[ref]))
+				else: parameters[ref]=checkDict(parameters[ref],INSTRUMENT_MODES)
 			elif ref in ['BIAS','FLAT','ARC','ARC_SHALLOW','ARC_DEEP']:
 				dt = {}
 				for p in parts[1:]:
@@ -1575,7 +1726,7 @@ def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
 
 
 
-def makeBias(files,method='median',folder='./',mode='',prefix='',overwrite=True,verbose=ERROR_CHECKING,output=''):
+def makeBias(files,method='median',folder='./',mode='',prefix='',overwrite=True,verbose=ERROR_CHECKING,output='',input_headers=None):
 	'''
 	:Purpose:
 
@@ -1600,7 +1751,16 @@ def makeBias(files,method='median',folder='./',mode='',prefix='',overwrite=True,
 		Note: currently this is only a pass through to ``combineImages()''; could include additional checks
 
 	'''
-	images,hds = readKastFiles(files,folder=folder,mode=mode,prefix=prefix)
+	if isinstance(files[0],str) or isinstance(files[0],int) or isinstance(files[0],float): 
+		images,hds = readFiles(files,folder=folder,mode=mode,prefix=prefix)
+	elif isinstance(files[0],numpy.ndarray):
+		images = copy.deepcopy(files)
+		hds = copy.deepcopy(input_headers)
+		if not isinstance(hds,list): raise ValueError('If passing an image array, be sure to pass the list of image headers in input_headers keyword')
+		if len(hds) != len(images): raise ValueError('list of input headers is not the same length as list of images')
+	else:
+		raise ValueError('Input should be a list of files or numpy 2D arrays')
+
 	if len(numpy.shape(images))==2:
 		if verbose==True: print('Warning: image array is just a single image of dimensions {}; returning'.format(numpy.shape(images)))
 		return images,hds
@@ -1618,7 +1778,7 @@ def makeBias(files,method='median',folder='./',mode='',prefix='',overwrite=True,
 	return im,hds[0]
 
 
-def makeFlat(files,bias,method='median',quantile=0.9,folder='./',mode='',prefix='',verbose=ERROR_CHECKING,overwrite=True,output=''):
+def makeFlat(files,bias,method='median',quantile=0.9,folder='./',mode='',prefix='',verbose=ERROR_CHECKING,overwrite=True,output='',input_headers=None):
 	'''
 	:Purpose:
 
@@ -1645,15 +1805,24 @@ def makeFlat(files,bias,method='median',quantile=0.9,folder='./',mode='',prefix=
 		TBD
 
 	'''
-	images,hds = readKastFiles(files,folder=folder,mode=mode,prefix=prefix)
+	if isinstance(files[0],str) or isinstance(files[0],int) or isinstance(files[0],float): 
+		images,hds = readFiles(files,folder=folder,mode=mode,prefix=prefix)
+	elif isinstance(files[0],numpy.ndarray):
+		images = copy.deepcopy(files)
+		hds = copy.deepcopy(input_headers)
+		if not isinstance(hds,list): raise ValueError('If passing an image array, be sure to pass the list of image headers in input_headers keyword')
+		if len(hds) != len(images): raise ValueError('list of input headers is not the same length as list of images')
+	else:
+		raise ValueError('Input should be a list of files or numpy 2D arrays')
+
 	if len(numpy.shape(images))==2:
 		if verbose==True: print('Warning: image array is just a single image of dimensions {}; returning'.format(numpy.shape(images)))
 		return images,hds
 
 # read in bias if necessary
 	if isinstance(bias,str): 
-		if os.path.exists(bias): bias,bhd = readKastFiles(bias)
-		elif os.path.exists(folder+'/'+bias): bias,bhd = readKastFiles(folder+'/'+bias)
+		if os.path.exists(bias): bias,bhd = readFiles(bias)
+		elif os.path.exists(folder+'/'+bias): bias,bhd = readFiles(folder+'/'+bias)
 		else: raise ValueError('Cannot find bias file {}'.format(bias))
 		if kastRBMode(bhd) != kastRBMode(hds[0]): raise ValueError('Red/blue mode of bias frame is {} while that of flat field frames is {}'.format(kastRBMode(bhd),kastRBMode(hds[0])))
 
@@ -1672,7 +1841,7 @@ def makeFlat(files,bias,method='median',quantile=0.9,folder='./',mode='',prefix=
 	return im,hds[0]
 
 
-def makeMask(bias,flat,sclip=3.,mode='',verbose=ERROR_CHECKING,overwrite=True,output=''):
+def makeMask(bias,flat,sclip=3.,flatmin=0.01,mode='',verbose=ERROR_CHECKING,overwrite=True,output=''):
 	'''
 	Creates a mask file: 0 = OK, 1 = BAD
 	Input: flat, bias
@@ -1681,13 +1850,13 @@ def makeMask(bias,flat,sclip=3.,mode='',verbose=ERROR_CHECKING,overwrite=True,ou
 
 # read in bias and flat if necessary
 	if isinstance(bias,str): 
-		if os.path.exists(bias): bias,bhd = readKastFiles(bias)
-		elif os.path.exists(folder+'/'+bias): bias,bhd = readKastFiles(folder+'/'+bias)
+		if os.path.exists(bias): bias,bhd = readFiles(bias)
+		elif os.path.exists(folder+'/'+bias): bias,bhd = readFiles(folder+'/'+bias)
 		else: raise ValueError('Cannot find bias file {}'.format(bias))
 		if mode=='': mode = kastRBMode(bhd)
 	if isinstance(flat,str): 
-		if os.path.exists(flat): flat,fhd = readKastFiles(flat)
-		elif os.path.exists(folder+'/'+flat): flat,fhd = readKastFiles(folder+'/'+flat)
+		if os.path.exists(flat): flat,fhd = readFiles(flat)
+		elif os.path.exists(folder+'/'+flat): flat,fhd = readFiles(folder+'/'+flat)
 		else: raise ValueError('Cannot find flat file {}'.format(flat))
 		if mode=='': mode = kastRBMode(fhd)
 	if mode=='': 
@@ -1699,7 +1868,7 @@ def makeMask(bias,flat,sclip=3.,mode='',verbose=ERROR_CHECKING,overwrite=True,ou
 	mask[flat<0.] = 1
 	mask[bias<0.] = 1
 # mask out pixels outside of illuminated region
-	mask[flat<(0.01*numpy.quantile(flat[mask==0],0.9))] = 1
+	mask[flat<(flatmin*numpy.quantile(flat[mask==0],0.9))] = 1
 #	profile = numpy.nanmedian(flat,axis=axis)
 #	notorder = numpy.arange(len(profile))
 #	notorder = notorder[profile<(0.01*numpy.nanmax(profile))]
@@ -1760,7 +1929,7 @@ def reduceScienceImage(image, bias, flat, mask=[], hd={}, mode='', rdmode='', ga
 # read in image if necessary
 	im = copy.deepcopy(image)	
 	if isinstance(image,str) or isinstance(image,int): 
-		im,hd = readKastFiles(image,folder=folder,mode=mode)
+		im,hd = readFiles(image,folder=folder,mode=mode)
 # CCD keywords
 	if mode=='':
 		try: mode = kastRBMode(hd)
@@ -1785,13 +1954,13 @@ def reduceScienceImage(image, bias, flat, mask=[], hd={}, mode='', rdmode='', ga
 
 # read in bias and flat if necessary
 	if isinstance(bias,str): 
-		if os.path.exists(bias): bias,bhd = readKastFiles(bias)
-		elif os.path.exists(folder+'/'+bias): bias,bhd = readKastFiles(folder+'/'+bias)
+		if os.path.exists(bias): bias,bhd = readFiles(bias)
+		elif os.path.exists(folder+'/'+bias): bias,bhd = readFiles(folder+'/'+bias)
 		else: raise ValueError('Cannot find bias file {}'.format(bias))
 		if kastRBMode(bhd) != kastRBMode(hd): raise ValueError('Red/blue mode of bias frame is {} while that of science frames is {}'.format(kastRBMode(bhd),kastRBMode(hd)))
 	if isinstance(flat,str): 
-		if os.path.exists(flat): flat,fhd = readKastFiles(flat)
-		elif os.path.exists(folder+'/'+flat): flat,fhd = readKastFiles(folder+'/'+flat)
+		if os.path.exists(flat): flat,fhd = readFiles(flat)
+		elif os.path.exists(folder+'/'+flat): flat,fhd = readFiles(folder+'/'+flat)
 		else: raise ValueError('Cannot find flat file {}'.format(flat))
 		if kastRBMode(fhd) != kastRBMode(hd): raise ValueError('Red/blue mode of flat frame is {} while that of science frames is {}'.format(kastRBMode(bhd),kastRBMode(hd)))
 
@@ -1862,6 +2031,8 @@ def findPeak(im,rng=[],cntr=-1,window=50,trace_slice=[],method='maximum',verbose
 def traceDispersion(im,cntr=-1,window=5,step_size=5,trace_slice=[],fit_order=3,fitcycle=5,sigclip=3,method='maximum',verbose=ERROR_CHECKING,plot_file=''):
 	'''
 	Traces dispersion
+
+	NEED TO FIX REGIONS THAT ARE MASKED
 	'''
 # fix trace_slice if not provided
 	if len(trace_slice)==0: trace_slice=[150,len(im[0,:])-150]
@@ -2014,7 +2185,7 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 	if len(var) == 0: var = im*0
 
 # identify spatial location of source if not provided
-	if cntr<0.: cntr=findPeak(im,verbose=verbose,**center_kwargs)   
+	if cntr<=0.: cntr=findPeak(im,verbose=verbose,**center_kwargs)   
 	cntr = int(cntr)
 
 #	if len(trace)==0 and shift_trace==False:
@@ -2072,6 +2243,7 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 
 # extract spectrum and uncertainty
 	flx,unc = [],[]
+#	print(numpy.shape(imsub),cntr,src_wnd)
 	for i in range(len(im[0,:])):
 		src = imsub[(cntr-src_wnd):(cntr+src_wnd+1),i]
 		vsrc = var[(cntr-src_wnd):(cntr+src_wnd+1),i]
@@ -2181,17 +2353,16 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 	return sp
 
 
-def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_order=6,sfit_order=2,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=[],pixel0=[],cntr=0.,fitcycle=5,sclip=2.,plot_file=''):
+def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_order=-1,sfit_order=2,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=[],pixel0=[],cntr=0.,fitcycle=5,sclip=2.,plot_file=''):
 	'''
 	Wavelength calibration from arc lamp
 	Input: arc, list of lines
 	Output: dictionary containing pixel->wave conversion, fit diagnostics
-	THIS ASSUMES RED ONLY
 	NEED TO INCLUDE HELIOCENTRIC CORRECTION EXPLICITLY
 	'''
 # check inputs
 	if dispersion in list(DISPERSIONS.keys()):
-		resolution = DISPERSIONS[dispersion]['RESOLUTION']
+		if resolution == 0.: resolution = DISPERSIONS[dispersion]['RESOLUTION']
 		if len(lam0)==0.: lam0 = [DISPERSIONS[dispersion]['LAM0']]
 	if len(prior)==0 and (resolution==0. or lam0 ==0.):
 		raise ValueError('You must provide prior fit coefficients (prior={}), specify the dispersion (dispersion={}), or specify the resolution (resolution={}) and strongest line wavelength (lam0={})'.format(prior,dispersion,resolution,lam0))
@@ -2212,6 +2383,7 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 				9534.17,9665.43])
 		alines = numpy.append(near,hehgcd)
 		strong = numpy.array([5944.83,6143.06,6402.25,6506.52,6678.2,6929.47,7032.41,7245.17,7438.90,7635.105,8115.31,8377.61,8919.5007,8988.58,9122.9660])
+		if fit_order < 0: fit_order = 6
 	elif mode=='BLUE':
 		extwidth = 30
 		swindow = 30
@@ -2221,7 +2393,20 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 				4358.33,4471.50,4678.16,4799.92,4921.93,5015.68,5085.82,5460.74,5769.59,5790.65])
 		alines = hehgcd
 		strong = numpy.array([3466.55,4046.56,4358.33,4678.16,4799.92,5085.82,5460.74,5875.62,5944.83])
-		fit_order = 4
+		if fit_order < 0: fit_order = 4
+	elif mode=='LDSS3':
+		extwidth = 30
+		swindow = 30
+		dwindow = 30
+		cntr = 250
+		sfit_order = 3
+		deep_threshold = 0.003
+		alines = numpy.array([6096.1630,6163.5939,6217.2813,6266.495,6304.7892,6334.4279,6382.9914,6402.246,\
+			6506.5279,6532.8824,6598.9529,6678.20,6717.0428,6929.468,7032.4127,7173.939,7245.167,7281.349,7383.98,\
+			7503.867,7635.105,7723.8,8014.786,8115.311,8264.521,8300.325,8424.647,8521.441,8654.383,8782.1872,\
+			9122.966,9224.498,9657.784])
+		strong = numpy.array([6402.246,6678.20,7383.98,7503.867,7723.8,8014.786,8424.647,8521.441,9122.966,9657.784])
+		if fit_order < 0: fit_order = 4
 	else: raise ValueError('You must specify the red/blue mode (mode=RED or BLUE); mode={} was passed'.format(mode))
 
 	cal_wave = {}
@@ -2231,12 +2416,12 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 		if cntr==0.: cntr = int(0.5*len(arcim[:,0]))
 		trace = numpy.zeros(len(arcim[0,:]))+cntr
 	tr = [int(t) for t in trace]
-	ext = extractSpectrum(arcim,method='arc',subtract_background=False,trace=tr,src_wnd=extwidth,shift_trace=False,verbose=verbose)
+	ext = extractSpectrum(arcim,method='arc',subtract_background=False,cntr=cntr,trace=tr,src_wnd=extwidth,shift_trace=False,verbose=verbose)
 	arctrace = ext.flux.value
 	arctrace = arctrace-numpy.nanmin(arctrace)
 	arctrace = arctrace/numpy.nanmax(arctrace)
 	if len(deep)>0:
-		ext = extractSpectrum(deep,method='arc',subtract_background=False,trace=tr,src_wnd=extwidth,shift_trace=False,verbose=verbose)
+		ext = extractSpectrum(deep,method='arc',subtract_background=False,cntr=cntr,trace=tr,src_wnd=extwidth,shift_trace=False,verbose=verbose)
 		arctrace_deep = ext.flux.value
 		arctrace_deep = arctrace_deep-numpy.nanmin(arctrace_deep)
 		arctrace_deep = arctrace_deep/numpy.nanmax(arctrace_deep)
@@ -2328,7 +2513,10 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 	diff = lines_y-numpy.polyval(p2,lines_x)
 	wave = numpy.polyval(p2,numpy.arange(len(atrace)))
 	rms = numpy.nanstd(lines_y-numpy.polyval(p2,lines_x))
-	if verbose==True: print('Final deep line pass: RMS={:.3f} Ang at {:.2f} Ang for {} lines and fit order {}, dRV = {:.1f} km/s'.format(rms,numpy.nanmedian(wave),len(lines_y),sfit_order,3.e5*rms/numpy.nanmedian(wave)))
+	if verbose==True: 
+		print('Final deep line pass: RMS={:.3f} Ang at {:.2f} Ang for {} lines and fit order {}, dRV = {:.1f} km/s'.format(rms,numpy.nanmedian(wave),len(lines_y),sfit_order,3.e5*rms/numpy.nanmedian(wave)))
+		print('Coefficients:')
+		for coeff in p2: print('\t{}'.format(coeff))
 
 # generate reporting structure	
 	cal_wave['COEFF'] = p2
@@ -2749,7 +2937,7 @@ def profileCheck(instructions='',cntr=335,verbose=ERROR_CHECKING,trace_slice=[25
 	for k in ['SOURCE','TELLURIC','FLUXCAL']:
 	# for src in list(parameters['SOURCE'].keys()):
 	# 	if verbose==True: print('Checking spatial profile of {}'.format(src))
-	# 	im,hd = readKastFiles(parameters['SOURCE'][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
+	# 	im,hd = readFiles(parameters['SOURCE'][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
 	# 	if 'CENTER' in list(parameters['SOURCE'][src].keys()): cntr = int(parameters['SOURCE'][src]['CENTER'])
 	# 	cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src,parameters['MODE']))
 	# 	if verbose==True: print('Best center = {}'.format(cntr))
@@ -2757,7 +2945,7 @@ def profileCheck(instructions='',cntr=335,verbose=ERROR_CHECKING,trace_slice=[25
 		if len(list(parameters[k].keys()))>0:
 			for src in list(parameters[k].keys()):
 				if verbose==True: print('Checking spatial profile of {}'.format(src))
-				im,hd = readKastFiles(parameters[k][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
+				im,hd = readFiles(parameters[k][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
 				if 'CENTER' in list(parameters[k][src].keys()): cntr = int(parameters[k][src]['CENTER'])
 				cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src,parameters['MODE']))
 				if verbose==True: print('Best center = {}'.format(cntr))
@@ -2795,7 +2983,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		# 	bias_file=''
 		# else:
 		# 	if verbose==True: print('\nReading in bias frame from file {}'.format(bias_file))
-		# 	redux['BIAS'],redux['BIAS_HEADER'] = readKastFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
+		# 	redux['BIAS'],redux['BIAS_HEADER'] = readFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
 	if 'FLAT_REUSE' in list(redux['PARAMETERS'].keys()): flat_file = redux['PARAMETERS']['FLAT_REUSE']
 	if 'MASK_REUSE' in list(redux['PARAMETERS'].keys()): mask_file = redux['PARAMETERS']['MASK_REUSE']
 
@@ -2818,7 +3006,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			bias_file=''
 		else: 
 			if verbose==True: print('\nReading in bias frame from file {}'.format(bias_file))
-			redux['BIAS'],redux['BIAS_HEADER'] = readKastFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
+			redux['BIAS'],redux['BIAS_HEADER'] = readFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
 	if 'BIAS' not in list(redux.keys()) or (reset==True and 'BIAS_REUSE' not in list(redux['PARAMETERS'].keys())) or bias_file=='':
 		bias_file='{}/bias_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
 		if verbose==True: print('\nReducing bias frames')
@@ -2829,7 +3017,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 	# 	print(reset,bias_file)
 	# 	if bias_file!='' and reset==False:
 	# 		if verbose==True: print('\nReading in bias frame from file {}'.format(bias_file))
-	# 		redux['BIAS'],redux['BIAS_HEADER'] = readKastFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
+	# 		redux['BIAS'],redux['BIAS_HEADER'] = readFiles(bias_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
 	# 	else:
 
 # read or create flat field frame		
@@ -2841,7 +3029,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			flat_file=''
 		else: 
 			if verbose==True: print('\nReading in flat field frame from file {}'.format(flat_file))
-			redux['FLAT'],redux['FLAT_HEADER'] = readKastFiles(flat_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
+			redux['FLAT'],redux['FLAT_HEADER'] = readFiles(flat_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
 	if 'FLAT' not in list(redux.keys()) or (reset==True and 'FLAT_REUSE' not in list(redux['PARAMETERS'].keys())) or flat_file=='':
 		flat_file='{}/flat_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
 		if verbose==True: print('\nReducing flat field frames')
@@ -2856,7 +3044,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			mask_file=''
 		else: 
 			if verbose==True: print('\nReading in mask frame from file {}'.format(mask_file))
-			redux['MASK'],redux['MASK_HEADER'] = readKastFiles(mask_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
+			redux['MASK'],redux['MASK_HEADER'] = readFiles(mask_file,mode=redux['PARAMETERS']['MODE'],rotate=False)
 	if 'MASK' not in list(redux.keys()) or (reset==True and 'MASK_REUSE' not in list(redux['PARAMETERS'].keys())) or mask_file=='':
 		mask_file='{}/mask_{}.fits'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE'])
 		if verbose==True: print('\nGenerating mask file')
@@ -2881,8 +3069,8 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		except: print('WARNING: could not read in prior wavelength calibration structure from {}'.format(cal_wave_file))
 	if 'CAL_WAVE' not in list(redux.keys()) or reset==True or kwargs.get('reset_wavecal',False) == True:
 		if verbose==True: print('\nDetermining baseline wavelength solution')
-		arcsh,arcshhd = readKastFiles(redux['PARAMETERS']['ARC_SHALLOW']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
-		arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
+		arcsh,arcshhd = readFiles(redux['PARAMETERS']['ARC_SHALLOW']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
+		arcdp,arcdphd = readFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 # check mode
 		arcmode = kastRBMode(arcshhd)
 		if arcmode!=redux['PARAMETERS']['MODE']: raise ValueError('Warning: arc image mode {} is not the same as reduction mode {}'.format(arcmode,redux['PARAMETERS']['MODE']))
@@ -2904,7 +3092,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 	if ('CAL_FLUX' not in list(redux.keys()) or reset==True or kwargs.get('reset_fluxcal',False) == True) and 'FLUXCAL' in list(redux['PARAMETERS'].keys()):
 		ref = list(redux['PARAMETERS']['FLUXCAL'].keys())[0]
 		if verbose==True: print('\nAnalyzing flux calibrator {}'.format(ref))
-		ims,hds = readKastFiles(redux['PARAMETERS']['FLUXCAL'][ref]['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
+		ims,hds = readFiles(redux['PARAMETERS']['FLUXCAL'][ref]['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 		if len(redux['PARAMETERS']['FLUXCAL'][ref]['FILES']) > 1:
 			im,hd = crRejectCombine(ims,verbose=verbose),hds[0]
 		else: im,hd = ims,hds
@@ -2931,7 +3119,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		spflx.name = redux['PARAMETERS']['FLUXCAL'][ref]['NAME']
 		spflx.header = hd
 #		spflx = extractSpectrum(imr,var,mask=redux['MASK'],trace=trace,src_wnd=10)
-		arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
+		arcdp,arcdphd = readFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 		arcrect = rectify(arcdp,trace)
 		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['MODE']))
 		spflx.applyWaveCal(arcrecal)
@@ -2960,7 +3148,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		if verbose==True: print('\nComputing telluric corrections')
 		redux['CAL_TELL'] = {}
 		for tstar in list(redux['PARAMETERS']['TELLURIC'].keys()):
-			ims,hds = readKastFiles(redux['PARAMETERS']['TELLURIC'][tstar]['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
+			ims,hds = readFiles(redux['PARAMETERS']['TELLURIC'][tstar]['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 			if len(redux['PARAMETERS']['TELLURIC'][tstar]['FILES']) > 1: im,hd = crRejectCombine(ims,verbose=verbose),hds[0]
 			else: im,hd = ims,hds
 # some parameters
@@ -2989,7 +3177,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			spflx.name = tstar
 			spflx.header = hd
 # reidentify arc lines
-			arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
+			arcdp,arcdphd = readFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 			arcrect = rectify(arcdp,trace)
 			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 # apply wavelength calibration
@@ -3033,7 +3221,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		if src not in list(redux.keys()) or reset==True or kwargs.get('reset_source',False) == True:
 			if verbose==True: print('\nExtracting {} spectrum of {}'.format(redux['PARAMETERS']['MODE'],src))
 #			print(redux['PARAMETERS']['SOURCE'][src])
-			ims,hds = readKastFiles(redux['PARAMETERS']['SOURCE'][src]['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'],verbose=verbose,)
+			ims,hds = readFiles(redux['PARAMETERS']['SOURCE'][src]['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'],verbose=verbose,)
 			if len(redux['PARAMETERS']['SOURCE'][src]['FILES']) > 1:
 				im = crRejectCombine(ims,verbose=verbose)
 				hd = hds[0]
@@ -3099,7 +3287,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			spflx.name = src
 			spflx.header = hd
 # reapply arc solution
-			arcdp,arcdphd = readKastFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
+			arcdp,arcdphd = readFiles(redux['PARAMETERS']['ARC_DEEP']['FILES'],folder=redux['PARAMETERS']['DATA_FOLDER'],mode=redux['PARAMETERS']['MODE'])
 			arcrect = rectify(arcdp,trace)
 			arcrecal = waveCalibrateArcs(arcrect,trace=trace,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src,redux['PARAMETERS']['MODE']))
 			spflx.applyWaveCal(arcrecal)
