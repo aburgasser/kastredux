@@ -44,7 +44,7 @@ if sys.version_info.major == 2:	 # switch for those using python 3
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2021.10.07'
+VERSION = '2021.11.06'
 __version__ = VERSION
 GITHUB_URL = 'https://github.com/aburgasser/kastredux/'
 
@@ -541,7 +541,7 @@ class Spectrum(object):
 		fself = interp1d(self.wave.value,self.variance.value,bounds_error=False,fill_value=0.)
 		fother = interp1d(other.wave.value,other.variance.value,bounds_error=False,fill_value=0.)
 		if numpy.random.choice(numpy.isfinite(self.variance.value))==True and numpy.random.choice(numpy.isfinite(other.variance.value))==True: 
-			out.variance = numpy.multiply(out.flux.value**2,((numpy.divide(flxs(out.wave.value),fself(out.wave.value))**2)+(numpy.divide(flxo(out.wave.value),fother(out.wave.value))**2)))*self.variance.unit*other.variance.unit
+			out.variance = numpy.multiply(out.flux.value**2,((numpy.divide(flxs(out.wave.value),fself(out.wave.value),out=numpy.zeros_like(flxs(out.wave.value)), where=fself(out.wave.value)!=0)**2)+(numpy.divide(flxo(out.wave.value),fother(out.wave.value),out=numpy.zeros_like(flxo(out.wave.value)), where=fother(out.wave.value)!=0)**2)))*self.variance.unit*other.variance.unit
 		elif numpy.random.choice(numpy.isfinite(self.variance.value))==True:
 			out.variance = (numpy.multiply(flxo(out.wave.value),fself(out.wave.value))**2)*self.variance.unit*(other.flux.unit**2)
 		elif numpy.random.choice(numpy.isfinite(other.variance.value))==True:
@@ -581,18 +581,17 @@ class Spectrum(object):
 		for k in ['flux','background']:
 			fself = interp1d(self.wave.value,getattr(self,k).value,bounds_error=False,fill_value=0.)
 			fother = interp1d(other.wave.value,getattr(other,k).value,bounds_error=False,fill_value=0.)
-# NOTE: THERE IS A PERSISTENT ERROR HERE
-			setattr(out,k,numpy.divide(fself(out.wave.value),fother(out.wave.value))*(getattr(self,k).unit)/(getattr(other,k).unit))
+			setattr(out,k,numpy.divide(fself(out.wave.value),fother(out.wave.value),out=numpy.zeros_like(fself(out.wave.value)), where=fother(out.wave.value)!=0)*(getattr(self,k).unit)/(getattr(other,k).unit))
 			if k=='flux': flxs,flxo = fself,fother
 # special for variance
 		fself = interp1d(self.wave.value,self.variance.value,bounds_error=False,fill_value=0.)
 		fother = interp1d(other.wave.value,other.variance.value,bounds_error=False,fill_value=0.)
 		if numpy.random.choice(numpy.isfinite(self.variance.value))==True and numpy.random.choice(numpy.isfinite(other.variance.value))==True: 
-			out.variance = numpy.multiply(out.flux.value**2,((numpy.divide(flxs(out.wave.value),fself(out.wave.value))**2)+(numpy.divide(flxo(out.wave.value),fother(out.wave.value))**2)))*self.variance.unit/other.variance.unit
+			out.variance = numpy.multiply(out.flux.value**2,((numpy.divide(flxs(out.wave.value),fself(out.wave.value),out=numpy.zeros_like(flxs(out.wave.value)), where=fself(out.wave.value)!=0)**2)+(numpy.divide(flxo(out.wave.value),fother(out.wave.value),out=numpy.zeros_like(flxo(out.wave.value)), where=fother(out.wave.value)!=0)**2)))*self.variance.unit/other.variance.unit
 		elif numpy.random.choice(numpy.isfinite(self.variance.value))==True:
-			out.variance = (numpy.divide(fself(out.wave.value),flxo(out.wave.value))**2)*self.variance.unit/(other.flux.unit**2)
+			out.variance = (numpy.divide(fself(out.wave.value),flxo(out.wave.value),out=numpy.zeros_like(fself(out.wave.value)), where=flxo(out.wave.value)!=0)**2)*self.variance.unit/(other.flux.unit**2)
 		elif numpy.random.choice(numpy.isfinite(other.variance.value))==True:
-			out.variance = (numpy.divide(fother(out.wave.value),flxs(out.wave.value))**2)*self.variance.unit/(other.flux.unit**2)
+			out.variance = (numpy.divide(fother(out.wave.value),flxs(out.wave.value),out=numpy.zeros_like(fother(out.wave.value)), where=flxs(out.wave.value)!=0)**2)*self.variance.unit/(other.flux.unit**2)
 		else:
 			out.variance = numpy.array([numpy.nan]*len(out.wave))
 		out.unc = out.variance**0.5
@@ -1431,7 +1430,7 @@ def readFiles(num,folder='./',mode='RED',prefix='',suffix='',rotate=False,trim=[
 			rotate = INSTRUMENT_MODES[mode]['ROTATE']
 			trim = INSTRUMENT_MODES[mode]['TRIM']
 #		files = ['{}/{}{}.fits'.format(folder,prefix,str(n).zfill(4)) for n in nlist]
-		files = ['{}/{}{}{}.fits'.format(folder,prefix,str(n).zfill(4),suffix) for n in nlist]
+		files = ['{}/{}{}{}.fits'.format(folder,prefix,str(n),suffix) for n in nlist]
 
 # read in files
 	for f in files:
@@ -1965,17 +1964,33 @@ def reduceScienceImage(image, bias, flat, mask=[], hd={}, mode='', rdmode='', ga
 		if kastRBMode(fhd) != kastRBMode(hd): raise ValueError('Red/blue mode of flat frame is {} while that of science frames is {}'.format(kastRBMode(bhd),kastRBMode(hd)))
 
 # process image
-	image_b = im-bias
+	if numpy.shape(bias)==numpy.shape(im): image_b = im-bias
+	else: 
+		print('WARNING! bias image is not the same shape ({}) as science image ({}); ignoring bias subtraction'.format(numpy.shape(bias),numpy.shape(im)))
+		image_b = copy.deepcopy(im)
 	image_e = image_b*gain
-# mask flat before dividing
+# mask flat 
 	if len(mask)==0: mask = image_e*0
-	fm = maskClean(flat,mask,replace=1.)
-	image_f = image_e/(fm*exposure)
-	variance = (image_e/fm+rn**2)/(exposure**2)
+	if numpy.shape(flat)==numpy.shape(mask): fm = maskClean(flat,mask,replace=1.)
+	else: 
+		print('WARNING! flat image is not the same shape ({}) as mask image ({}); ignoring mask clean'.format(numpy.shape(flat),numpy.shape(mask)))
+		fm = copy.deepcopy(flat)
+# divide image by flat 
+	if numpy.shape(fm)==numpy.shape(image_e): 
+		image_f = image_e/(fm*exposure)
+		variance = (image_e/fm+rn**2)/(exposure**2)
+	else: 
+		print('WARNING! flat image is not the same shape ({}) as science image ({}); ignoring flat fielding'.format(numpy.shape(fm),numpy.shape(image_e)))
+		image_f = image_e/exposure
+		variance = (image_e+rn**2)/(exposure**2)
 # mask image
 	if mask_image==True:
-		image_f = maskClean(image_f,mask,replace=numpy.nanmedian(image_f))	
-		variance = maskClean(variance,mask,replace=numpy.nanmax(variance))	
+		if numpy.shape(image_f)==numpy.shape(mask):
+			image_f = maskClean(image_f,mask,replace=numpy.nanmedian(image_f))	
+			variance = maskClean(variance,mask,replace=numpy.nanmax(variance))	
+		else: 
+			print('WARNING! mask image is not the same shape ({}) as science image ({}); ignoring mask clean'.format(numpy.shape(mask),numpy.shape(image_f)))
+
 	return image_f,variance
 
 
@@ -2255,7 +2270,9 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 		if numpy.nansum(prf)==0.: prf = copy.deepcopy(profile)
 # extract fluxes & uncertainties - not entirely sure about the variance calculation...
 		flx.append(numpy.nansum(src*prf)/numpy.nansum(prf))
+#
 # NOTE: THERE IS A PERSISTENT ERROR HERE
+#
 		unc.append((numpy.nansum(vsrc*prf)**0.5)/numpy.nansum(prf))
 	flx = numpy.array(flx)
 	unc = numpy.array(unc)
@@ -2353,7 +2370,7 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 	return sp
 
 
-def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_order=-1,sfit_order=2,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=[],pixel0=[],cntr=0.,fitcycle=5,sclip=2.,plot_file=''):
+def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_order=-1,sfit_order=2,verbose=ERROR_CHECKING,middle=True,resolution=0.,lam0=[],pixel0=[],cntr=0.,fitcycle=7,sclip=2.,plot_file=''):
 	'''
 	Wavelength calibration from arc lamp
 	Input: arc, list of lines
@@ -2650,7 +2667,7 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 	return cal_flux
 
 
-def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,sclip=3.,smooth=5,fit_range=[],calfolder=TELLSTDFOLDER,stdfile='',plot_file='',verbose=ERROR_CHECKING):
+def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,sclip=3.,smooth=5,snlimit=30,fit_range=[],calfolder=TELLSTDFOLDER,stdfile='',plot_file='',verbose=ERROR_CHECKING):
 	'''
 	Uses spectrum of telluric calibrator to determine a second-order flux calibration correction
 	Input: telluric cal spectrum, spt
@@ -2709,6 +2726,10 @@ def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,sclip=3.,smooth=5,fit_ra
 	ratio.scale(1./calscalefactor)
 	ratio.smooth(smooth)
 
+# force ends
+#	ratio[:50] = numpy.nanmedian(ratio[50:150])
+#	ratio[-50:] = numpy.nanmedian(ratio[-150:-50])
+
 # regions of strong telluric absorption	
 	tranges = [[5800,6000],[6230,6340],[6850,7050],[7140,7350],[7580,7700],[8080,8360],[8920,9800]]
 # regions of G/A star line absorption	
@@ -2719,11 +2740,16 @@ def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,sclip=3.,smooth=5,fit_ra
 
 # define mask
 	mask[numpy.isnan(flx)==True] = 1
-	mask[ratio.flux.value<0] = 1
+	mask[ratio.flux.value<=0.4] = 1
+	mask[ratio.flux.value>=1.6] = 1
 	mask[numpy.isfinite(ratio.flux.value)==False] = 1
+	mask[numpy.isfinite(tellsp.flux.value/tellsp.unc.value)==False] = 1
+	mask[tellsp.flux.value/tellsp.unc.value < snlimit] = 1
 	for t in tranges: mask[numpy.logical_and(wv>=t[0],wv<=t[1])]=1
 #	for t in glines: mask[numpy.logical_and(wv>=t[0],wv<=t[1])]=1
 	mask[numpy.logical_or(wv<fit_range[0],wv>fit_range[1])]=1
+
+
 
 # determine a flux correction in unmasked regions of ratio
 	for i in range(fit_cycle):
@@ -2942,13 +2968,14 @@ def profileCheck(instructions='',cntr=335,verbose=ERROR_CHECKING,trace_slice=[25
 	# 	cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src,parameters['MODE']))
 	# 	if verbose==True: print('Best center = {}'.format(cntr))
 
-		if len(list(parameters[k].keys()))>0:
-			for src in list(parameters[k].keys()):
-				if verbose==True: print('Checking spatial profile of {}'.format(src))
-				im,hd = readFiles(parameters[k][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
-				if 'CENTER' in list(parameters[k][src].keys()): cntr = int(parameters[k][src]['CENTER'])
-				cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src,parameters['MODE']))
-				if verbose==True: print('Best center = {}'.format(cntr))
+		if k in list(parameters.keys()):
+			if len(list(parameters[k].keys()))>0:
+				for src in list(parameters[k].keys()):
+					if verbose==True: print('Checking spatial profile of {}'.format(src))
+					im,hd = readFiles(parameters[k][src]['FILES'][0],folder=parameters['DATA_FOLDER'],mode=parameters['MODE'])
+					if 'CENTER' in list(parameters[k][src].keys()): cntr = int(parameters[k][src]['CENTER'])
+					cntr = findPeak(im,cntr=cntr,window=30,trace_slice=trace_slice,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(parameters['REDUCTION_FOLDER'],src,parameters['MODE']))
+					if verbose==True: print('Best center = {}'.format(cntr))
 
 	return
 
@@ -3324,10 +3351,88 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 	return
 
 
+
+
 ############################################################
 # KAST SPECTRAL ANALYSIS FUNCTIONS
 # These functions perform some basic analysis on spectra
 ############################################################
+
+# Spectral indices
+INDICES = {
+    'kirkpatrick1999': {'altname': ['kirkpatrick','kirkpatrick19','kir99'], 'bibcode': '1999ApJ...519..802K', 'indices': {\
+        'Rb-a': {'ranges': ([.77752,.77852]*u.micron,[.78152,.78252]*u.micron,[.77952,.78052]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+        'Rb-b': {'ranges': ([.79226,.79326]*u.micron,[.79626,.79726]*u.micron,[.79426,.79526]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+        'Na-a': {'ranges': ([.81533,.81633]*u.micron,[.81783,.81883]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'Na-b': {'ranges': ([.81533,.81633]*u.micron,[.81898,.81998]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'Cs-a': {'ranges': ([.84961,.85061]*u.micron,[.85361,.85461]*u.micron,[.85161,.85261]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+        'Cs-b': {'ranges': ([.89185,.89285]*u.micron,[.89583,.89683]*u.micron,[.89385,.89485]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+        'TiO-a': {'ranges': ([.7033,.7048]*u.micron,[.7058,.7073]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'TiO-b': {'ranges': ([.8400,.8415]*u.micron,[.8435,.8470]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'VO-a': {'ranges': ([.7350,.7370]*u.micron,[.7550,.7570]*u.micron,[.7430,.7470]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
+        'VO-b': {'ranges': ([.7860,.7880]*u.micron,[.8080,.8100]*u.micron,[.7960,.8000]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
+        'CrH-a': {'ranges': ([.8580,.8600]*u.micron,[.8621,.8641]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'CrH-b': {'ranges': ([.9940,.9960]*u.micron,[.9970,.9990]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'FeH-a': {'ranges': ([.8660,.8680]*u.micron,[.8700,.8720]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'FeH-b': {'ranges': ([.9863,.9883]*u.micron,[.9908,.9928]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'Color-a': {'ranges': ([.9800,.9850]*u.micron,[.7300,.7350]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'Color-b': {'ranges': ([.9800,.9850]*u.micron,[.7000,.7050]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'Color-c': {'ranges': ([.9800,.9850]*u.micron,[.8100,.8150]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'Color-d': {'ranges': ([.9675,.9850]*u.micron,[.7350,.7550]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+	}},\
+    'martin1999': {'altname': ['martin','martin99','mar99'], 'bibcode': '1999AJ....118.2466M', 'indices': {\
+        'PC3': {'ranges': ([.823,.827]*u.micron,[.754,.758]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'PC6': {'ranges': ([.909,.913]*u.micron,[.650,.654]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'CrH1': {'ranges': ([.856,.860]*u.micron,[.861,.865]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'CrH2': {'ranges': ([.984,.988]*u.micron,[.997,1.001]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'FeH1': {'ranges': ([.856,.860]*u.micron,[.8685,.8725]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'FeH2': {'ranges': ([.984,.988]*u.micron,[.990,.994]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'H2O1': {'ranges': ([.919,.923]*u.micron,[.928,.932]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'TiO1': {'ranges': ([.700,.704]*u.micron,[.706,.710]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'TiO2': {'ranges': ([.838,.842]*u.micron,[.844,.848]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'VO1': {'ranges': ([.754,.758]*u.micron,[.742,.746]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+        'VO2': {'ranges': ([.799,.803]*u.micron,[.790,.794]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+    }},\
+    'gizis1997': {'altname': ['gizis','gizis97','giz97'], 'bibcode': '', 'indices': {\
+		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avdenom','sample': 'average'},\
+		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+    	'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+    'lepine2003': {'altname': ['lepine','lepine03','lep03'], 'bibcode': '', 'indices': {\
+		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avdenom','sample': 'average'},\
+		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+    	'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'VO1': {'ranges': [[7430, 7470]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'TiO6': {'ranges': [[7550,7570]*u.Angstrom,[7745,7765]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'VO2': {'ranges': [[7920, 7960]*u.Angstrom,[8440, 8470]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'TiO7': {'ranges': [[8440, 8470]*u.Angstrom,[8400, 8420]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'Color-M': {'ranges': [[8105, 8155]*u.Angstrom,[6510, 6560],*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'reid1995': {'altname': ['reid','reid95','rei95'], 'bibcode': '', 'indices': {\
+		'TiO1': {'ranges': [[6718, 6723]*u.Angstrom,[6703, 6708]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'TiO2': {'ranges': [[7058, 7061]*u.Angstrom,[7043, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'TiO3': {'ranges': [[7092, 7097]*u.Angstrom,[7079, 7084]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'TiO4': {'ranges': [[7130, 7135]*u.Angstrom,[7115, 7120]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'TiO5': {'feature': [[7126, 7135]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avdenom','sample': 'average'},\
+		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+    	'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+        'CaOH': {'ranges': [[6230, 6240]*u.Angstrom,[6345, 6354]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'burgasser2003': {'altname': ['burgasser','burgasser03','bur03'], 'bibcode': '', 'indices': {\
+		'CsI-A': {'range': [[8496.1, 8506.1]*u.Angstrom, [8536.1, 8546.1]*u.Angstrom,[8516.1, 8626.1]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+        'CsI-B': {'range': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+        'H2O': {'range': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+        'CrH-A': {'range': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+        'CrH-B': {'range': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+        'FeH-A': {'range': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+        'FeH-B': {'range': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+        'Color-e': {'range': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+}
+
 
 def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
 	'''
@@ -3422,7 +3527,7 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 
 
 
-def compareSpectra_simple(sp1,sp2orig,fit_range=[],exclude_range=[],plot=False,plot_file='',**kwargs):
+def compareSpectra_simple(sp1,sp2orig,fit_range=[],exclude_range=[],error_value=numpy.nan,plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
 	'''
 	A stripped down version of compareSpectra() to address errors 
 	'''
@@ -3441,38 +3546,48 @@ def compareSpectra_simple(sp1,sp2orig,fit_range=[],exclude_range=[],plot=False,p
 		weights[wave>numpy.nanmax(fit_range)]=0
 	if len(exclude_range)>1:
 		weights[numpy.logical_and(wave>numpy.nanmin(exclude_range),wave<numpy.nanmax(exclude_range))]=0
-	scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*f2*f2/vtot)
-	stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
-	if plot==True: 
-		plt.clf()
-		xlim = kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)])
-		ylim = kwargs.get('ylim',[-2.*numpy.nanmedian(u1),1.2*numpy.nanquantile(f1,0.95)])
-		fig = plt.figure(figsize=[8,6])
-		grid = plt.GridSpec(4, 1, hspace=0, wspace=0.2)
-		ax_top = fig.add_subplot(grid[:-1,0])
-		ax_btm = fig.add_subplot(grid[-1,0])
-		ax_top.plot(wave,f1,'k-')
-		ax_top.plot(wave,f2*scale_factor,'m-')
-		ax_top.legend([sp1.name,sp2.name],fontsize=16)
-		ax_top.plot(wave,u1,'k--')
-		ax_top.plot(wave,numpy.zeros(len(wave)),'k:')
-		ax_top.set_xlim(xlim)
-		ax_top.set_ylim(ylim)
-		ax_top.set_ylabel('Flux Density',fontsize=16)
-		ax_btm.plot(wave,f1-f2*scale_factor,'k-')
-		ax_btm.plot(wave,u1,'k--')
-		ax_btm.plot(wave,-1.*u1,'k--')
-		ax_btm.fill_between(wave,-1.*u1,u1,color='k',alpha=0.1)
-		ax_btm.plot(wave,numpy.zeros(len(wave)),'k--')
-		ax_btm.set_xlim(xlim)
-		ax_btm.set_ylim([-3.*numpy.nanmedian(u1),3.*numpy.nanmedian(u1)])
-		ax_btm.set_xlabel('Wavelength (Angstrom)',fontsize=16)
-		ax_btm.set_ylabel('O-C',fontsize=16)
-		wv = wave[weights==0]
-		if len(wv)>0:
-			for w in wv: 
-				ax_top.plot(ylim,[w,w],c='grey',ls='-',alpha=0.3)
-				ax_btm.plot([-3.*numpy.nanmedian(u1),3.*numpy.nanmedian(u1)],[w,w],c='grey',ls='-',alpha=0.3)
+	if numpy.nansum(weights)>0:
+		scale_factor = numpy.nansum(weights*f1*f2/vtot)/numpy.nansum(weights*f2*f2/vtot)
+		stat = numpy.nansum(weights*(f1-f2*scale_factor)**2/vtot)
+		if plot==True: 
+			plt.clf()
+			xlim = kwargs.get('xlim',[numpy.nanmin(wave),numpy.nanmax(wave)])
+			ylim = kwargs.get('ylim',[-2.*numpy.nanmedian(u1),1.2*numpy.nanquantile(f1,0.95)])
+			fig = plt.figure(figsize=[8,6])
+			grid = plt.GridSpec(4, 1, hspace=0, wspace=0.2)
+			ax_top = fig.add_subplot(grid[:-1,0])
+			ax_btm = fig.add_subplot(grid[-1,0])
+			ax_top.plot(wave,f1,'k-')
+			ax_top.plot(wave,f2*scale_factor,'m-')
+			ax_top.legend([sp1.name,sp2.name],fontsize=16)
+			ax_top.plot(wave,u1,'k--')
+			ax_top.plot(wave,numpy.zeros(len(wave)),'k:')
+			ax_top.set_xlim(xlim)
+			ax_top.set_ylim(ylim)
+			ax_top.set_ylabel('Flux Density',fontsize=16)
+			ax_btm.plot(wave,f1-f2*scale_factor,'k-')
+			ax_btm.plot(wave,u1,'k--')
+			ax_btm.plot(wave,-1.*u1,'k--')
+			ax_btm.fill_between(wave,-1.*u1,u1,color='k',alpha=0.1)
+			ax_btm.plot(wave,numpy.zeros(len(wave)),'k--')
+			ax_btm.set_xlim(xlim)
+			ax_btm.set_ylim([-5.*numpy.nanmedian(u1),5.*numpy.nanmedian(u1)])
+			ax_btm.set_xlabel('Wavelength (Angstrom)',fontsize=16)
+			ax_btm.set_ylabel('O-C',fontsize=16)
+			wv = wave[weights==0]
+			if len(wv)>0:
+				for w in wv: 
+					ax_top.plot(ylim,[w,w],c='grey',ls='-',alpha=0.3)
+					ax_btm.plot([-3.*numpy.nanmedian(u1),3.*numpy.nanmedian(u1)],[w,w],c='grey',ls='-',alpha=0.3)
+			if plot_file!='': 
+				fig.savefig(plot_file)
+				plt.close()
+
+	else:
+		scale_factor = error_value 
+		stat = error_value
+		if verbose==True: print('No data matched in fit range or was in non-excluded regions')
+
 
 # 		fig,(ax1,ax2) = plt.subplots(2,1,sharex='col',figsize=kwargs.get('figsize',[8,8]))
 # 		ax1.plot(wave,f1,c=kwargs.get('color',PLOT_DEFAULTS['color']),ls=kwargs.get('ls',PLOT_DEFAULTS['ls']),alpha=kwargs.get('alpha',PLOT_DEFAULTS['alpha']))
@@ -3500,9 +3615,6 @@ def compareSpectra_simple(sp1,sp2orig,fit_range=[],exclude_range=[],plot=False,p
 # #		ax2.set_xticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 # #		ax2.set_yticks(fontsize=kwargs.get('fontsize',PLOT_DEFAULTS['fontsize']))
 # 		ax2.plot(wave,numpy.zeros(len(wave)),c=kwargs.get('zero_color',PLOT_DEFAULTS['zero_color']),ls=kwargs.get('zero_ls',PLOT_DEFAULTS['zero_ls']),alpha=kwargs.get('zero_alpha',PLOT_DEFAULTS['zero_alpha']))
-		if plot_file!='': 
-			fig.savefig(plot_file)
-			plt.close()
 #		plt.clf()
 
 	return stat,scale_factor
@@ -3570,11 +3682,14 @@ def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6800,8800],verbose=ERRO
 	sts = []
 	stds = list(SPTSTDS.keys())
 	for s in stds:
-		st,scl = compareSpectra_simple(spec,SPTSTDS[s],fit_range=fit_range,plot=False,**kwargs)
-		sts.append(st)
+		st,scl = compareSpectra_simple(spec,SPTSTDS[s],fit_range=fit_range,error_value=numpy.nan,plot=False,**kwargs)
+		if numpy.isfinite(st) == False: sts.append(1.e10)
+		elif st <= 0: sts.append(1.e10)
+		else: sts.append(st)
+		if verbose==True: print('\t{}: {:.2f}'.format(SPTSTDS[s],st))
 	spt = stds[numpy.argmin(sts)]
-	if plot_file != '': st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,plot=True,plot_file=plot_file)
-	else: st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,plot=False)
+	if plot_file != '': st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,error_value=numpy.nan,plot=True,plot_file=plot_file,**kwargs)
+	else: st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,error_value=numpy.nan,plot=False,**kwargs)
 
 	return spt
 
