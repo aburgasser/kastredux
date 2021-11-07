@@ -109,7 +109,7 @@ PLOT_DEFAULTS = {'figsize': [6,4], 'fontsize': 16,
 
 TELLSTDFOLDER = CODE_PATH+'/resources/telluric_standards/'
 
-ERROR_CHECKING = True
+ERROR_CHECKING = False
 
 
 ############################################################
@@ -1067,12 +1067,12 @@ def makeLog(folder,output='log.csv',prefix='',suffix='',mode='RED',sort='DATETIM
 		if c in list(hdkey.keys()): dp[c] = ['']*len(files)
 	dp['Note'] = ['']*len(files)
 	for i,f in enumerate(files):
-	    hdu = fits.open(f)
-	    hdu.verify('silentfix')
-	    h = hdu[0].header
-	    hdu.close()
-	    for c in logkeys: 
-	    	if c in list(hdkey.keys()): dp.loc[i,c] = h[hdkey[c]]
+		hdu = fits.open(f)
+		hdu.verify('silentfix')
+		h = hdu[0].header
+		hdu.close()
+		for c in logkeys: 
+			if c in list(hdkey.keys()): dp.loc[i,c] = h[hdkey[c]]
 
 # for kast data, TIME-OBS is created from DATE-OBS
 	if mode=='RED' or mode=='BLUE':
@@ -3358,80 +3358,123 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 # These functions perform some basic analysis on spectra
 ############################################################
 
-# Spectral indices
-INDICES = {
-    'kirkpatrick1999': {'altname': ['kirkpatrick','kirkpatrick19','kir99'], 'bibcode': '1999ApJ...519..802K', 'indices': {\
-        'Rb-a': {'ranges': ([.77752,.77852]*u.micron,[.78152,.78252]*u.micron,[.77952,.78052]*u.micron), 'method': 'line', 'sample': 'integrate'},\
-        'Rb-b': {'ranges': ([.79226,.79326]*u.micron,[.79626,.79726]*u.micron,[.79426,.79526]*u.micron), 'method': 'line', 'sample': 'integrate'},\
-        'Na-a': {'ranges': ([.81533,.81633]*u.micron,[.81783,.81883]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'Na-b': {'ranges': ([.81533,.81633]*u.micron,[.81898,.81998]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'Cs-a': {'ranges': ([.84961,.85061]*u.micron,[.85361,.85461]*u.micron,[.85161,.85261]*u.micron), 'method': 'line', 'sample': 'integrate'},\
-        'Cs-b': {'ranges': ([.89185,.89285]*u.micron,[.89583,.89683]*u.micron,[.89385,.89485]*u.micron), 'method': 'line', 'sample': 'integrate'},\
-        'TiO-a': {'ranges': ([.7033,.7048]*u.micron,[.7058,.7073]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'TiO-b': {'ranges': ([.8400,.8415]*u.micron,[.8435,.8470]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'VO-a': {'ranges': ([.7350,.7370]*u.micron,[.7550,.7570]*u.micron,[.7430,.7470]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
-        'VO-b': {'ranges': ([.7860,.7880]*u.micron,[.8080,.8100]*u.micron,[.7960,.8000]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
-        'CrH-a': {'ranges': ([.8580,.8600]*u.micron,[.8621,.8641]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'CrH-b': {'ranges': ([.9940,.9960]*u.micron,[.9970,.9990]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'FeH-a': {'ranges': ([.8660,.8680]*u.micron,[.8700,.8720]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'FeH-b': {'ranges': ([.9863,.9883]*u.micron,[.9908,.9928]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'Color-a': {'ranges': ([.9800,.9850]*u.micron,[.7300,.7350]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'Color-b': {'ranges': ([.9800,.9850]*u.micron,[.7000,.7050]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'Color-c': {'ranges': ([.9800,.9850]*u.micron,[.8100,.8150]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'Color-d': {'ranges': ([.9675,.9850]*u.micron,[.7350,.7550]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+# PROGRAM CONSTANTS FOR ANALYSIS
+INDEX_SETS = {
+	'kirkpatrick1999': {'altname': ['kirkpatrick','kirkpatrick19','kir99'], 'bibcode': '1999ApJ...519..802K', 'indices': {\
+		'Rb-a': {'ranges': ([.77752,.77852]*u.micron,[.78152,.78252]*u.micron,[.77952,.78052]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+		'Rb-b': {'ranges': ([.79226,.79326]*u.micron,[.79626,.79726]*u.micron,[.79426,.79526]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+		'Na-a': {'ranges': ([.81533,.81633]*u.micron,[.81783,.81883]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Na-b': {'ranges': ([.81533,.81633]*u.micron,[.81898,.81998]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Cs-a': {'ranges': ([.84961,.85061]*u.micron,[.85361,.85461]*u.micron,[.85161,.85261]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+		'Cs-b': {'ranges': ([.89185,.89285]*u.micron,[.89583,.89683]*u.micron,[.89385,.89485]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+		'TiO-a': {'ranges': ([.7033,.7048]*u.micron,[.7058,.7073]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'TiO-b': {'ranges': ([.8400,.8415]*u.micron,[.8435,.8470]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'VO-a': {'ranges': ([.7350,.7370]*u.micron,[.7550,.7570]*u.micron,[.7430,.7470]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
+		'VO-b': {'ranges': ([.7860,.7880]*u.micron,[.8080,.8100]*u.micron,[.7960,.8000]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
+		'CrH-a': {'ranges': ([.8580,.8600]*u.micron,[.8621,.8641]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'CrH-b': {'ranges': ([.9940,.9960]*u.micron,[.9970,.9990]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'FeH-a': {'ranges': ([.8660,.8680]*u.micron,[.8700,.8720]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'FeH-b': {'ranges': ([.9863,.9883]*u.micron,[.9908,.9928]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Color-a': {'ranges': ([.9800,.9850]*u.micron,[.7300,.7350]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Color-b': {'ranges': ([.9800,.9850]*u.micron,[.7000,.7050]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Color-c': {'ranges': ([.9800,.9850]*u.micron,[.8100,.8150]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Color-d': {'ranges': ([.9675,.9850]*u.micron,[.7350,.7550]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
 	}},\
-    'martin1999': {'altname': ['martin','martin99','mar99'], 'bibcode': '1999AJ....118.2466M', 'indices': {\
-        'PC3': {'ranges': ([.823,.827]*u.micron,[.754,.758]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'PC6': {'ranges': ([.909,.913]*u.micron,[.650,.654]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'CrH1': {'ranges': ([.856,.860]*u.micron,[.861,.865]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'CrH2': {'ranges': ([.984,.988]*u.micron,[.997,1.001]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'FeH1': {'ranges': ([.856,.860]*u.micron,[.8685,.8725]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'FeH2': {'ranges': ([.984,.988]*u.micron,[.990,.994]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'H2O1': {'ranges': ([.919,.923]*u.micron,[.928,.932]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'TiO1': {'ranges': ([.700,.704]*u.micron,[.706,.710]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'TiO2': {'ranges': ([.838,.842]*u.micron,[.844,.848]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'VO1': {'ranges': ([.754,.758]*u.micron,[.742,.746]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-        'VO2': {'ranges': ([.799,.803]*u.micron,[.790,.794]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-    }},\
-    'gizis1997': {'altname': ['gizis','gizis97','giz97'], 'bibcode': '', 'indices': {\
-		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avdenom','sample': 'average'},\
-		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-    	'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	'martin1999': {'altname': ['martin','martin99','mar99'], 'bibcode': '1999AJ....118.2466M', 'indices': {\
+		'PC3': {'ranges': ([.823,.827]*u.micron,[.754,.758]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'PC6': {'ranges': ([.909,.913]*u.micron,[.650,.654]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'CrH1': {'ranges': ([.856,.860]*u.micron,[.861,.865]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'CrH2': {'ranges': ([.984,.988]*u.micron,[.997,1.001]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'FeH1': {'ranges': ([.856,.860]*u.micron,[.8685,.8725]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'FeH2': {'ranges': ([.984,.988]*u.micron,[.990,.994]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'H2O1': {'ranges': ([.919,.923]*u.micron,[.928,.932]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'TiO1': {'ranges': ([.700,.704]*u.micron,[.706,.710]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'TiO2': {'ranges': ([.838,.842]*u.micron,[.844,.848]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'VO1': {'ranges': ([.754,.758]*u.micron,[.742,.746]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'VO2': {'ranges': ([.799,.803]*u.micron,[.790,.794]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
 	}},\
-    'lepine2003': {'altname': ['lepine','lepine03','lep03'], 'bibcode': '', 'indices': {\
-		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avdenom','sample': 'average'},\
+	'gizis1997': {'altname': ['gizis','gizis97','giz97'], 'bibcode': '', 'indices': {\
+		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avedenom','sample': 'average'},\
 		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-    	'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'VO1': {'ranges': [[7430, 7470]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'TiO6': {'ranges': [[7550,7570]*u.Angstrom,[7745,7765]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'VO2': {'ranges': [[7920, 7960]*u.Angstrom,[8440, 8470]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'TiO7': {'ranges': [[8440, 8470]*u.Angstrom,[8400, 8420]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'Color-M': {'ranges': [[8105, 8155]*u.Angstrom,[6510, 6560],*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'lepine2003': {'altname': ['lepine','lepine03','lep03'], 'bibcode': '', 'indices': {\
+		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avedenom','sample': 'average'},\
+		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'VO1': {'ranges': [[7430, 7470]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO6': {'ranges': [[7550,7570]*u.Angstrom,[7745,7765]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'VO2': {'ranges': [[7920, 7960]*u.Angstrom,[8440, 8470]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO7': {'ranges': [[8440, 8470]*u.Angstrom,[8400, 8420]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'Color-M': {'ranges': [[8105, 8155]*u.Angstrom,[6510, 6560]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 	}},\
 	'reid1995': {'altname': ['reid','reid95','rei95'], 'bibcode': '', 'indices': {\
 		'TiO1': {'ranges': [[6718, 6723]*u.Angstrom,[6703, 6708]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'TiO2': {'ranges': [[7058, 7061]*u.Angstrom,[7043, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'TiO3': {'ranges': [[7092, 7097]*u.Angstrom,[7079, 7084]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'TiO4': {'ranges': [[7130, 7135]*u.Angstrom,[7115, 7120]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'TiO5': {'feature': [[7126, 7135]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO2': {'ranges': [[7058, 7061]*u.Angstrom,[7043, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO3': {'ranges': [[7092, 7097]*u.Angstrom,[7079, 7084]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO4': {'ranges': [[7130, 7135]*u.Angstrom,[7115, 7120]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO5': {'feature': [[7126, 7135]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avdenom','sample': 'average'},\
 		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-    	'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-        'CaOH': {'ranges': [[6230, 6240]*u.Angstrom,[6345, 6354]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaOH': {'ranges': [[6230, 6240]*u.Angstrom,[6345, 6354]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 	}},\
 	'burgasser2003': {'altname': ['burgasser','burgasser03','bur03'], 'bibcode': '', 'indices': {\
 		'CsI-A': {'range': [[8496.1, 8506.1]*u.Angstrom, [8536.1, 8546.1]*u.Angstrom,[8516.1, 8626.1]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
-        'CsI-B': {'range': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
-        'H2O': {'range': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-        'CrH-A': {'range': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-        'CrH-B': {'range': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-        'FeH-A': {'range': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-        'FeH-B': {'range': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-        'Color-e': {'range': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CsI-B': {'range': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+		'H2O': {'range': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-A': {'range': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-B': {'range': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-A': {'range': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-B': {'range': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'Color-e': {'range': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 	}},\
 }
+
+ZETA_RELATIONS = {
+	'lepine2007': {'altname': ['lepine','lepine07','lep07'], 'reference': 'Lepine et al. (2007)','bibcode':'2007ApJ...669.1235L', 'coeff': [-0.164,0.67,-0.118,-0.05],'range': []},
+	'dhital2011': {'altname': ['dhital','dhital11','dhi11'], 'reference': 'Dhital et al. (2011)','bibcode':'', 'coeff': [-0.005,-0.183,0.694,-0.127,-0.047],'range': []},
+}
+
+EW_LINES = {
+	'H I': {'altname': ['H','H1','HI'], 'lines': [4861*u.Angstrom,6563*u.Angstrom]},\
+	'Li I': {'altname': ['Li','Li1','LiI'], 'lines': [6708*u.Angstrom]},\
+	'K I': {'altname': ['K','K1','KI'], 'lines': [7665*u.Angstrom,7699*u.Angstrom]},\
+	'Na I': {'altname': ['Na','Na1','NaI'], 'lines': [8183*u.Angstrom,8195*u.Angstrom]},\
+	'Cs I': {'altname': ['Cs','Cs1','CsI'], 'lines': [8521*u.Angstrom,8943*u.Angstrom]},\
+	'Rb I': {'altname': ['Rb','Rb1','RbI'], 'lines': [7800*u.Angstrom,7948*u.Angstrom]},\
+	'Ca I': {'altname': ['Ca','Ca1','CaI'], 'lines': [7209*u.Angstrom,7213*u.Angstrom,7326*u.Angstrom]},\
+	'Ca II': {'altname': ['Ca2','CaII'], 'lines': [8436*u.Angstrom]},\
+	'Ti I': {'altname': ['Ti','Ti1','Ti I'], 'lines': [6573*u.Angstrom,8542*u.Angstrom]},\
+}
+
+CHI_RELATIONS = {
+    'schmidt2014': {'altname': ['schmidt','schmidt14'], 'reference': 'Schmidt et al. (2014)','bibcode':'2014PASP..126..642S', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-6,
+        'spt': [17,18,19,20,21,22,23,24,25,26,27], \
+        'values': [10.28,4.26,2.52,1.98,2.25,2.11,1.67,1.16,1.46,1.23,0.73],\
+        'scatter': [3.13,1.18,0.58,0.27,0.11,0.36,0.22,0.3,0.28,0.3,0.3],\
+        },
+    'douglas2014': {'altname': ['douglas','douglas14'], 'reference': 'Douglas et al. (2014)','bibcode':'2014ApJ...795..161D', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-5,
+        'spt': [10,11,12,13,14,15,16,17,18,19], \
+        'values': [6.6453,6.0334,5.2658,4.4872,3.5926,2.4768,1.7363,1.2057,0.6122,0.3522],\
+        'scatter': [0.6207,0.5326,0.5963,0.4967,0.5297,0.4860,0.3475,0.3267,0.2053,0.1432],\
+        },
+}
+
+# HELPFUL FUNCTIONS
+def padWhereArray(w,mx):
+	'''
+	Purpose:
+
+		Pads the output of a numpy.where array to select (if available) one more index spot beyond limits
+
+	'''
+	if w[0][0] > 0: w = (numpy.insert(w[0],0,w[0][0]-1),)
+	if w[0][-1] < mx: w = (numpy.append(w[0],w[0][-1]+1),)
+	return w
+
 
 
 def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
@@ -3637,14 +3680,15 @@ def stitchOrders():
 	'''
 	pass
 
-def initializeStandards(spt,sdss=True,folder=SPTSTDFOLDER,reset=False,sd=False,esd=False,usd=False,beta=False,giant=False,gamma=False,verbose=False):
+def initializeStandards(spt,sdss=True,folder=SPTSTDFOLDER,reset=False,sd=False,esd=False,usd=False,beta=False,giant=False,gamma=False,verbose=ERROR_CHECKING):
 	'''
 	Read spectral standards into standards structure
 	'''
 	if isinstance(spt,list) == False: spt = [spt]
+	if len(spt) == 0: spt = [0,28]
 	if isinstance(spt[0],float) == True or isinstance(spt[0],int) == True: 
 		if len(spt) == 2: spt = numpy.arange(spt[0],spt[1]+1)
-		spt = [typeToNum(s) for s in spt] 
+		spt = [typeToNum(s) for s in spt]
 
 	if sd==True and 'sd' not in spt[0]: spt = ['sd'+s for s in spt]
 	if esd==True and 'esd' not in spt[0]: spt = ['esd'+s for s in spt]
@@ -3669,13 +3713,14 @@ def initializeStandards(spt,sdss=True,folder=SPTSTDFOLDER,reset=False,sd=False,e
 				if verbose==True: print('Warning: cannot find a spectral standard for type {}'.format(s))
 	return
 
-def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6800,8800],verbose=ERROR_CHECKING,**kwargs):
+def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6500,8800],verbose=ERROR_CHECKING,**kwargs):
 	'''
 	Classification program using templates from resource library
 	this is a simplified version of program
 	'''
 	if not isinstance(spec,Spectrum): raise('classifyTemplate requires a kastredux Spectrum object as an input')
 	if not isinstance(spt,list): spt = [spt]
+	if len(spt)==0: spt = [50,78]
 	if len(spt)==1: spt = spt*2
 	if len(spt)==2: initializeStandards(spt)
 
@@ -3693,6 +3738,303 @@ def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6800,8800],verbose=ERRO
 
 	return spt
 
+
+def measureIndex(sp,ranges,sample='median',method='ratio',nsamples=100,noiseFlag=False,plot=False,verbose=ERROR_CHECKING,**pkwargs):
+	"""
+	Measures a spectral index on a spectrum based on defined methodology
+
+	Parameters
+	----------
+	sp : Spectrum class object
+		Single spectrum class object, should contain wave, flux and unc array elements
+
+	ranges : array of astropy Quantites
+		array of two-element lists that indicate the measurement regions in unitted wavelengths
+		should be of the form [[3000,4000]*u.Angstrom,[4000,5000]*u.Angstrom,[5000,6000]*u.Angstrom]
+
+	sample : string, default = 'integrate'
+		defines the method by which flux in each region is combined; options are:
+
+			* 'median': median value using numpy.nanmedian (default)
+			* 'average': average value using numpy.nanmean
+			* 'integrate': intergration using numpy.trapz
+			* 'sum': total value using numpy.nansum
+			* 'maximum' or 'max': maximum value using numpy.nanmax
+			* 'minimum' or 'min': minimum value using numpy.nanmin
+
+	method : string, default = 'ratio'
+		defines the method by which regions are combined, proscribed as:
+
+			* 'ratio': returns range[0]/range[1] (default)
+			* 'single': returns range[0]
+			* 'line' or 'avenum': returns 0.5 * (range[0]+range[1])/range[2]
+			* 'inverse_line' or 'avedenum': returns 2 * range[0]/(range[1]+range[2])
+			* 'change': returns 2 * (range[0]-range[1])/(range[0]+range[1])
+			* 'sumnum': returns (range[0]+range[1])/range[2] = 2 * line
+			* 'sumdenom': returns range[0]/(range[1]+range[2]) = 0.5 * inverse_line
+			* 'doubleratio': returns (range[0]/range[1])/(range[1]/range[2])
+			* 'allers': returns [range[2]*(lam0-lam1)/(lam2-lam1) + range[1]*(lam2-lam0)/(lam2-lam1)]/range[0]
+
+	nsamples : int, default = 100
+		number of samples for Monte Carlo uncertainty estimation
+
+	noiseFlag : bool, default = False
+		if True, do not conduct Monte Carlo uncertainty estimation 
+
+	plot : bool, default = False
+		if True, display plot of spectral region with index measurements indicated
+		NOTE: this functionality is not yet implemented  
+
+	verbose : bool, default = False
+		if True, give extra feedback in computation process  
+
+	Returns
+	-------
+	tuple of index measurement and uncertainty
+		if noiseFlag = True, uncertainty will by numpy.nan
+
+	Examples
+	--------
+
+	TBD
+
+	See Also
+	--------
+
+	measureIndexSet : measures a predefined set of indices contained in INDICES dictionary
+
+	""" 	
+
+
+# error checking on number of arguments provided
+	sample_types = ['integrate','sum','average','median','maximum','max','minimum','min']
+	method_types = ['ratio','single','line','inverse_line','change','avenum','avedenom','sumnum','sumdenom','doubleratio','allers']
+	if sample.lower() not in sample_types: raise ValueError('sample method {} not in allowed list: {}'.format(sample,sample_types))
+	if verbose: print('Using measurement method {}'.format(sample))
+	if method.lower() not in method_types: raise ValueError('index measurement method {} not in allowed list: {}'.format(method,method_types))
+	if verbose: print('Using index combination method {}'.format(method))
+
+	if len(ranges) == 0: raise ValueError('measureIndex needs at least 1 sample region; zero given')
+	if len(ranges) == 1: method = 'single'
+	if not isinstance(ranges[0],list) and not isinstance(ranges[0],numpy.ndarray) and not isinstance(ranges[0],tuple) and not isinstance(ranges[0],set):
+		raise ValueError('measureIndex needs a list of wavelength ranges, you entered {} which has type {}'.format(ranges,type(ranges[0])))
+	for r in ranges:
+		if len(r) != 2: raise ValueError('Problem with range {} in input ranges {}: must be 2-element array'.format(r,ranges))
+	if (len(ranges) < 2 and (method in ['ratio','change'])):
+		raise ValueError('Index method {} needs at least 2 sample regions'.format(method))
+	if (len(ranges) < 3 and (method in ['line','inverse_line','avenum','avedenom','sumnum','sumdenom','doubleratio','allers'])):
+		raise ValueError('Index method {} needs at least 3 sample regions'.format(method))
+
+
+# define the sample vectors
+	value = numpy.zeros(len(ranges))
+	value_sim = numpy.zeros((len(ranges),nsamples))
+
+# loop over all sampling regions
+	for i,waveRng in enumerate(ranges):
+
+# convert units
+		if isUnit(waveRng):
+			waveRng = (waveRng.to(sp.wave.unit)).value
+		elif isUnit(waveRng[0]):
+			waveRng = [(w.to(sp.wave.unit)).value for w in waveRng]
+		else:
+			waveRng = ((waveRng*DEFAULT_WAVE_UNIT).to(sp.wave.unit)).value
+		xNum = (numpy.arange(0,nsamples+1.0)/nsamples)* \
+			(numpy.nanmax(waveRng)-numpy.nanmin(waveRng))+numpy.nanmin(waveRng)
+
+# identify measureable regions
+		w = numpy.where(numpy.logical_and(\
+			numpy.logical_and(numpy.isnan(sp.flux.value) == False,numpy.isnan(sp.unc.value) == False),\
+			numpy.logical_and(sp.wave.value >= numpy.nanmin(waveRng),sp.wave.value <= numpy.nanmax(waveRng))))
+		if len(w[0]) == 0:
+			noiseFlag = True
+			w = numpy.where(numpy.logical_and(\
+				numpy.isnan(sp.flux) == False,\
+				numpy.logical_and(sp.wave.value >= numpy.nanmin(waveRng),sp.wave.value <= numpy.nanmax(waveRng))))
+		if len(w[0]) == 0:
+			if verbose: print('Warning: no data in the wavelength range {}'.format(waveRng))
+			return numpy.nan,numpy.nan
+
+# compute intepolated flux and noise
+#		w = padWhereArray(w,len(sp.wave))
+		f = interp1d(sp.wave.value[w],sp.flux.value[w],bounds_error=False,fill_value=numpy.nan)
+		yNum = f(xNum)
+		if noiseFlag == False:
+			s = interp1d(sp.wave.value[w],sp.unc.value[w],bounds_error=False,fill_value=0.)
+			yNum_e = s(xNum)
+
+# first compute the actual value
+		if (sample == 'integrate'): 
+			w = numpy.where(numpy.logical_and(numpy.isfinite(xNum)==True,numpy.isfinite(yNum)==True))
+			value[i] = trapz(yNum[w],xNum[w])
+		elif (sample == 'average'): value[i] = numpy.nanmean(yNum)
+		elif (sample == 'sum'): value[i] = numpy.nansum(yNum)
+		elif (sample == 'median'): value[i] = numpy.nanmedian(yNum)
+		elif (sample == 'maximum'): value[i] = numpy.nanmax(yNum)
+		elif (sample == 'minimum'): value[i] = numpy.nanmin(yNum)
+		else: value[i] = numpy.nanmean(yNum)
+		value_sim[i,:] = value[i]
+
+# now do Monte Carlo measurement of value and uncertainty
+# THERE IS A PROBLEM HERE - ALL VALUE_SIM = NAN
+		if noiseFlag == False: 
+			for j in numpy.arange(nsamples):
+
+				yVar = numpy.random.normal(yNum,yNum_e)
+				if (sample == 'integrate'): 
+					w = numpy.where(numpy.logical_and(numpy.isfinite(xNum)==True,numpy.isfinite(yVar)==True))
+					value_sim[i,j] = trapz(yVar[w],xNum[w])
+				elif (sample == 'average'): value_sim[i,j] = numpy.nanmean(yVar)
+				elif (sample == 'sum'): value_sim[i,j] = numpy.nansum(yVar)
+				elif (sample == 'median'): value_sim[i,j] = numpy.nanmedian(yVar)
+				elif (sample == 'maximum'): value_sim[i,j] = numpy.nanmax(yVar)
+				elif (sample == 'minimum'): value_sim[i,j] = numpy.nanmin(yVar)
+				else: value_sim[i,j] = numpy.nanmean(yVar)
+
+# compute index based on defined method
+# default is a simple ratio
+		if (method == 'single'): 
+			val,vals = value[0],value_sim[0,:]
+		elif (method == 'ratio'): 
+			val,vals = value[0]/value[1],value_sim[0,:]/value_sim[1,:]
+		elif (method == 'line' or method == 'avenum'): 
+			val,vals = 0.5*(value[0]+value[1])/value[2],0.5*(value_sim[0,:]+value_sim[1,:])/value_sim[2,:]
+		elif (method == 'inverse_line' or method == 'avedenom'):
+			val,vals = 2.*value[0]/(value[1]+value[2]),2.*value_sim[0,:]/(value_sim[1,:]+value_sim[2,:])
+		elif (method == 'change'): 
+			val,vals = 2.*(value[0]-value[1])/(value[0]+value[1]),2.*(value_sim[0,:]-value_sim[1,:])/(value_sim[0,:]+value_sim[1,:])
+		elif (method == 'sumnum'):
+			val,vals = (value[0]+value[1])/value[2],(value_sim[0,:]+value_sim[1,:])/value_sim[2,:]
+		elif (method == 'sumdenom'):
+			val,vals = value[0]/(value[1]+value[2]),value_sim[0,:]/(value_sim[1,:]+value_sim[2,:])
+		elif (method == 'doubleratio'):
+			val,vals = (value[0]/value[1])/(value[1]/value[2]),(value_sim[0,:]/value_sim[1,:])/(value_sim[1,:]/value_sim[2,:])
+		elif (method == 'allers'):
+			val = (((numpy.mean(ranges[0])-numpy.mean(ranges[1]))/(numpy.mean(ranges[2])-numpy.mean(ranges[1])))*value[2] \
+				+ ((numpy.mean(ranges[2])-numpy.mean(ranges[0]))/(numpy.mean(ranges[2])-numpy.mean(ranges[1])))*value[1]) \
+				/value[0]
+			vals = (((numpy.mean(ranges[0])-numpy.mean(ranges[1]))/(numpy.mean(ranges[2])-numpy.mean(ranges[1])))*value_sim[2,:] \
+				+ ((numpy.mean(ranges[2])-numpy.mean(ranges[0]))/(numpy.mean(ranges[2])-numpy.mean(ranges[1])))*value_sim[1,:]) \
+				/value_sim[0,:]
+		else:
+			val,vals = value[0]/value[1],value_sim[0,:]/value_sim[1,:]
+
+# PLOTTING/VISUALIZATION - not yet implemented
+		# if plot == True:
+		#	 bands = []
+		#	 for r in ranges: bands.append(r)
+		#	 inddict = {pkwargs.get('name','Index'): {'ranges': bands, 'value': value}}
+		#	 plotSpectrum(sp,bands=bands,bandlabels=[pkwargs.get('name','') for b in bands],**pkwargs)		
+
+# output mean, standard deviation
+
+	if noiseFlag == True: 
+		if verbose: print('Index value = {}'.format(val))
+		return val, numpy.nan
+	if verbose: print('Index value = {}+/-{}'.format(val,numpy.nanstd(vals)))
+	return val, numpy.nanstd(vals)
+
+
+
+
+def measureIndexSet(sp,ref='lepine2003',index_info={},range_keyword='ranges',method_keyword='method',sample_keyword='sample',info=False,verbose=ERROR_CHECKING,**kwargs):
+	"""
+	Measures a set of predefined or user-defined spectral indices
+
+	Parameters
+	----------
+	sp : Spectrum class object
+		Single spectrum class object, should contain wave, flux and unc array elements
+
+	ref : string, default = 'lepine2003'
+		named index set contained in the global variable INDEX_SETS
+		alternate names: reference, set
+
+	index_info : dict, default = {}
+		optional dictionary to define index set information, which should be structured as follows:
+		alternate names: indices, index, index_dict
+
+			* series of index name strings, each pointing to a sub-dictionary
+			* each sub-dictionary contains the following elements:
+				* 'ranges' (or range_keyword): array of 2-element quantities indicating spectral measurement windows
+				* 'sample' (or sample_keyword): method of sampling flux withn spectral windows
+				* 'method' (or method_keyword): method of combining spectral measurements
+
+	range_keyword : str, default = 'ranges'
+		defines the dictionary name assigned to spectral measurement windows
+
+	sample_keyword : str, default = 'sample'
+		defines the dictionary name assigned to the method of sampling flux
+
+	method_keyword : str, default = 'method'
+		defines the dictionary name assigned to the method of combining spectral measurements
+
+	info : bool, default = False
+		If True, report out the pre-defined index sets
+		alternate names: information, options, option, available
+
+	verbose : bool, default = False
+		if True, give extra feedback in computation process  
+
+	Returns
+	-------
+	dict of index measurements
+		keys correspond to the names of the indices, and point to 2-element tuple of (measurement, uncertainty) 
+
+	Examples
+	--------
+
+	TBD
+
+	See Also
+	--------
+
+	measureIndex : measures a single spectral index
+
+	""" 	
+
+# keyword parameters
+	for k in ['reference','set']: ref = kwargs.get(k,ref)
+	for k in ['indices','index','index_dict']: index_info = kwargs.get(k,index_info)
+	for k in ['option','options','information','available']: info = kwargs.get(k,info)
+
+# just return information on available sets
+	if info==True:
+		for k in list(INDEX_SETS.keys()):
+			inds = list(INDEX_SETS[k]['indices'].keys())
+			bibref = ''
+			if 'bibcode' in list(INDEX_SETS[k].keys()): bibref = INDEX_SETS[k]['bibcode']
+			r = inds[0]
+			for i in inds[1:]: r=r+','+i
+			print('{} (bibcode: {}): indices: {}'.format(k,bibref,r))
+		return
+
+# if index information is not passed, then check with INDEX_SET
+	if len(index_info) == 0:
+		tmp = checkDict(ref,INDEX_SETS)
+		if tmp==False: raise ValueError('Index set {} is not one of the predefined index sets: {}'.format(ref,list(INDEX_SETS.keys())))
+		index_info = copy.deepcopy(INDEX_SETS[tmp]['indices'])
+		if verbose: print('Measuring indices from {} (bibcode: {})'.format(tmp,INDEX_SETS[tmp]['bibcode']))
+
+# check that the relevant keywords are in the index dictionary
+	names = list(index_info.keys())
+	for n in names:
+		for k in [range_keyword,method_keyword,sample_keyword]:
+			if k not in list(index_info[n].keys()):
+				raise ValueError('Keyword {} must be present for each defined index in input index dictionary, but is missing for index {}'.format(k,n))
+
+# measure indices
+	result = {}
+	for n in names:
+		ind,err = measureIndex(sp,index_info[n][range_keyword],method=index_info[n][method_keyword],sample=index_info[n][sample_keyword],verbose=verbose,**kwargs)
+		result[n] = (ind,err)
+		if verbose == True: print('Index {}: {:.3f}+/-{:.3f}'.format(n,ind,err))
+
+	return result
+
+
+
 def classifyIndices(spec,set='',verbose=ERROR_CHECKING):
 	'''
 	Classification program using spectral indices
@@ -3700,19 +4042,334 @@ def classifyIndices(spec,set='',verbose=ERROR_CHECKING):
 	'''
 	pass
 
-def EW(spec,linewv,continuum=[],verbose=ERROR_CHECKING):
+
+
+
+
+
+def measureEW(sp,lc,width=0.,recenter=True,absorption=True,continuum=0.,continuum_fit_order=1,npixline=2,output_unit=u.Angstrom,output='ew',plot=False,plot_file='',label='',nsamples=100,verbose=ERROR_CHECKING):
 	'''
 	Program to measure spectral equivalent width
 	TBD
 	'''
-	pass
 
-def EWset(spec,set='',verbose=ERROR_CHECKING):
+	nloop = 5
+# input checks
+	if isinstance(sp,Spectrum)==False: raise ValueError('First input should be a Spectrum object not type {}'.format(type(sp)))
+	if isUnit(lc): line_center = lc.to(sp.wave.unit).value
+	else: line_center = copy.deepcopy(lc)
+	if not isinstance(line_center,int) and not isinstance(line_center,float):
+		raise ValueError('Second input value should be a single float number; you entered {}'.format(lc))		
+	if numpy.nanmin(sp.wave.value) > line_center or numpy.nanmax(sp.wave.value) < line_center:
+		print('Wavelength {} is outside spectral data limits of {} to {}'.format(line_center*sp.wave.unit,numpy.nanmin(sp.wave),numpy.nanmax(sp.wave)))
+		if output=='all': return {}
+		else: return numpy.nan,numpy.nan
+
+	if isUnit(width): line_width = width.to(sp.wave.unit).value
+	else: line_width = copy.deepcopy(width)
+	if not isinstance(line_width,int) and not isinstance(line_width,float):
+		raise ValueError('Line width value should be a single float number; you entered {}'.format(width))		
+# estimate line width if not provided
+	if float(line_width) == 0.:
+		ic = numpy.nanargmin(numpy.array([numpy.abs(a-line_center) for a in sp.wave.value]))
+		line_width = numpy.absolute(sp.wave.value[ic+int(npixline)]-sp.wave.value[ic-int(npixline)])
+
+# set up continuum		
+	if isUnit(continuum): cont = continuum.to(sp.wave.unit).value
+	else: cont = copy.deepcopy(continuum)
+	if isinstance(cont,int) or isinstance(cont,float): cont = [line_width,line_width+numpy.abs(cont)]
+	if cont[0] == cont[1]: cont = [line_width,line_width*2.]
+	if numpy.nanmax(cont) < line_center: cont = [c+line_center for c in cont]
+	if len(cont) < 4: cont = [2*line_center-cont[-1],2*line_center-cont[-2],cont[-1],cont[-2]]
+	if verbose==True: print('Line center = {}, Line width = {}, Continuum = {}'.format(line_center,line_width,cont))
+
+# preset fail condition
+	ew = numpy.nan
+	ew_unc = numpy.nan
+	line_center_measure = numpy.nan
+	line_center_measure_unc = numpy.nan
+	rv = numpy.nan
+	rv_unc = numpy.nan
+	
+# refine line centering
+	line_center_measure = line_center
+	if recenter == True:	
+		for i in range(nloop):
+			wc = numpy.where(numpy.logical_and(sp.wave.value >= line_center_measure-line_width,sp.wave.value <= line_center_measure+line_width))
+			wv = numpy.array(sp.wave.value[wc])
+			fl = numpy.array(sp.flux.value[wc])
+			if absorption == True: line_center_measure = wv[numpy.nanargmin(fl)]
+			else: line_center_measure = wv[numpy.nanargmax(fl)]
+	rv = ((line_center_measure-line_center)/line_center)*const.c.to(u.km/u.s)
+	cont = [c+line_center_measure-line_center for c in cont]
+
+# sample range
+	samplerng = [numpy.nanmin(cont)-0.1*(numpy.nanmax(cont)-numpy.nanmin(cont)),numpy.nanmax(cont)+0.1*(numpy.nanmax(cont)-numpy.nanmin(cont))]
+	if numpy.nanmax(sp.wave.value) < samplerng[0] or numpy.nanmin(sp.wave.value) > samplerng[1]:
+		print('Sample range {} to {} is outside the wavelength range of the spectrum {} to {}'.format(samplerng[0],samplerng[1],numpy.nanmin(sp.wave.value)*sp.wave.unit,numpy.nanmin(sp.wave.value)*sp.wave.unit))
+		return numpy.nan, numpy.nan
+		if output=='all': return {}
+		else: return numpy.nan,numpy.nan
+
+	w = numpy.where(numpy.logical_and(sp.wave.value >= samplerng[0],sp.wave.value <= samplerng[1]))
+	if len(w[0]) > 0:
+		f = interp1d(sp.wave.value[w],sp.flux.value[w],bounds_error=False,fill_value=0.)
+		wline = numpy.linspace(line_center_measure-line_width,line_center_measure+line_width,nsamples)
+		wcont = numpy.append(numpy.linspace(cont[0],cont[1],nsamples),numpy.linspace(cont[-2],cont[-1],nsamples))		
+		fline = f(wline)
+		fcont = f(wcont)
+		pcont = numpy.poly1d(numpy.polyfit(wcont,fcont,continuum_fit_order))
+		fcontfit = pcont(wline)
+		# print(wline,fline)
+		# print(wcont,fcont)
+		ew = (trapz((numpy.ones(len(wline))-(fline/fcontfit)), wline)*sp.wave.unit).to(output_unit)
+
+# plot this
+		if plot == True:
+			plt.clf()
+			plt.plot(sp.wave.value,sp.flux.value,'k-')
+			plt.fill_between(sp.wave.value,sp.flux.value-sp.unc.value,sp.flux.value+sp.unc.value,color='grey',alpha=0.2)
+			plt.plot(wline,fline,'m-')
+			plt.plot(wcont[wcont<line_center_measure-line_width],fcont[wcont<line_center_measure-line_width],'b-')
+			plt.plot(wcont[wcont>line_center_measure+line_width],fcont[wcont>line_center_measure+line_width],'b-')
+			plt.plot(wline,fcontfit,'b-')
+			plt.plot([line_center_measure,line_center_measure],[numpy.nanmin(sp.flux.value[w]),numpy.nanmax(sp.flux.value[w])],'k--')
+			plt.xlim(samplerng)
+			plt.ylim([numpy.nanmin(sp.flux.value[w]),numpy.nanmax(sp.flux.value[w])])
+			plt.title(label+' {:.4f}'.format(line_center_measure))
+			plt.xlabel('Wavelength ({})'.format(sp.wave.unit))
+			plt.ylabel('Flux Density ({})'.format(sp.flux.unit))
+			if plot_file != '': plt.savefig(plot_file)
+
+
+# MC for errors			
+		if numpy.median(sp.unc.value[w]) != numpy.nan and numpy.median(sp.unc.value[w]) != 0.:
+# default uncertainty = 2 x median uncertainty --> NOT USING
+			ew_unc = (2.*numpy.nanmedian(sp.unc.value[w])/pcont(line_center_measure)*(numpy.nanmax(wline)-numpy.nanmin(wline))*sp.wave.unit).to(output_unit)
+			ews,lns,rvs = [],[],[]
+			for i in range(nsamples):
+				wvv = sp.wave.value[w]
+				flxv = numpy.random.normal(sp.flux.value[w],sp.unc.value[w])
+#					spvar.flux = numpy.random.normal(sp.flux.value,sp.noise.value)*sp.flux.unit
+				line_center_measure_var = line_center
+				if recenter == True:	
+					for i in range(5):
+						wc = numpy.where(numpy.logical_and(wvv >= line_center_measure_var-line_width,wvv <= line_center_measure_var+line_width))
+						wc = numpy.where(numpy.logical_and(wvv >= line_center_measure_var-line_width,wvv <= line_center_measure_var+line_width))
+						wv = numpy.array(wvv[wc])
+						fl = numpy.array(flxv[wc])
+						if len(fl) > 0:
+							if absorption == True: line_center_measure_var = wv[numpy.nanargmin(fl)]
+							else: line_center_measure_var = wv[numpy.nanargmax(fl)]
+				lns.append(line_center_measure_var)
+				rvs.append((((line_center_measure_var-line_center)/line_center)*const.c.to(u.km/u.s)).value)
+
+				f = interp1d(wvv,flxv,bounds_error=False,fill_value=0.)
+				wline = numpy.linspace(line_center_measure_var-line_width,line_center_measure_var+line_width,nsamples)
+				wcont = numpy.append(numpy.linspace(cont[0],cont[1],nsamples),numpy.linspace(cont[-2],cont[-1],nsamples))		
+				fline = f(wline)
+				fcont = f(wcont)
+				pcont = numpy.poly1d(numpy.polyfit(wcont,fcont,continuum_fit_order))
+				fcontfit = pcont(wline)
+				ews.append(((trapz((numpy.ones(len(wline))-(fline/fcontfit)), wline)*sp.wave.unit).to(output_unit)).value)
+			rv_unc = numpy.std(rvs)*u.km/u.s
+#				ew_unc = numpy.sqrt(ew_unc**2+(numpy.std(ews)*output_unit)**2)
+			ew_unc = (numpy.std(ews)*output_unit)
+			line_center_measure_unc = numpy.std(lns)
+							
+	if output=='ew': return ew, ew_unc
+	elif output=='rv': return rv, rv_unc
+	elif output=='center': return line_center_measure*sp.wave.unit, line_center_measure_unc*sp.wave.unit
+	else:
+		return {'ew': ew, 
+			'ew_unc': ew_unc,
+			'line_center': line_center_measure*sp.wave.unit,
+			'line_center_unc': line_center_measure_unc*sp.wave.unit,
+			'rv': rv,
+			'rv_unc': rv_unc}
+
+
+
+def measureEWElement(sp,elem,verbose=ERROR_CHECKING,**kwargs):
 	'''
 	Program to measure spectral equivalent widths from a pre-defined set
 	TBD
 	'''
-	pass
+# input checks
+	if isinstance(sp,Spectrum)==False: raise ValueError('First input should be a Spectrum object not type {}'.format(type(sp)))
+	tmp = checkDict(elem,EW_LINES)
+	if tmp==False: raise ValueError('Element {} is not one of the predefined line sets: {}'.format(elem,list(EW_LINES.keys())))
+	lines = EW_LINES[tmp]['lines']
+	if verbose: print('Measuring EWs of {} lines at {}'.format(tmp,lines))
+
+# run through lines
+	output = {}
+	for l in lines:
+		res = measureEW(sp,l,**kwargs)
+		output['{}-{:.0f}'.format(tmp.replace(' ',''),l.value)] = res
+	return output
+
+
+def zeta(inp,ref='lepine2007',nsamples=100,noiseFlag=False,cah2_name='CaH2',cah3_name='CaH3',tio5_name='TiO5',verbose=ERROR_CHECKING,**kwargs):
+	"""
+	Measures the zeta paramter based on CaH2, CaH3, and TiO5 indices
+
+	Parameters
+	----------
+	inp : Spectrum class object OR dict
+		Can be either a single spectrum class object for which indices are measured, or a dictionary 
+		containing index measurements, with same structure as output of measureIndexSet; i.e.,
+		a series of index name strings, each pointing to 2-element array containing measurement and uncertainty
+		dictionary keys should include the names assigned to cah2_name, cah3_name, and tio5_name should be presend
+
+	ref : string, default = 'lepine2007'
+		named index set contained in the global variable INDEX_SETS
+		alternate names: reference, set
+
+
+	cah2_name : str, default = 'CaH2'
+		defines the dictionary name assigned to CaH2 index measurement
+
+	cah3_name : str, default = 'CaH3'
+		defines the dictionary name assigned to CaH3 index measurement
+
+	tio5_name : str, default = 'TiO5'
+		defines the dictionary name assigned to TiO5 index measurement
+
+	verbose : bool, default = False
+		if True, give extra feedback in computation process  
+
+	nsamples : int, default = 100
+		Number of Monte Carlo samples for uncertainty determination
+
+	noiseFlag : bool, default = False
+		if True, do not determine uncertainty through Monte Carlo sampling  
+
+	Returns
+	-------
+	tuple of floats
+		zeta value and its uncertainty
+
+	Examples
+	--------
+
+	TBD
+
+	See Also
+	--------
+
+	measureIndexSet : measures a set of spectral indices
+
+	""" 	
+
+# keyword parameters
+	for k in ['reference','set']: ref = kwargs.get(k,ref)
+
+# check ref is in ZETA_RELATIONS
+	tmp = checkDict(ref,ZETA_RELATIONS)
+	if tmp==False: raise ValueError('Reference {} is not one of the predefined calibrations: {}'.format(ref,list(ZETA_RELATIONS.keys())))
+	coeff = ZETA_RELATIONS[tmp]['coeff']
+	if verbose: print('Measuring zeta using the {} relation (bibcode: {})'.format(tmp,ZETA_RELATIONS[tmp]['bibcode']))
+
+# measure indices if this is a spectrum
+	if isinstance(inp,Spectrum):
+		indices = measureIndexSet(inp,ref='gizis1997',noiseFlag=noiseFlag,verbose=verbose)
+	elif isinstance(inp,dict):
+		indices = copy.deepcopy(inp)
+	else: raise ValueError('Input parameter should be a Spectrum object of dicitionary of index measurements; you passed a {}'.format(type(inp)))
+
+# make sure relevant indices are present and check for uncertainties
+	for k in [cah2_name,cah3_name,tio5_name]:
+		if k not in list(indices.keys()): raise ValueError('Index {} is not among input indices: {}'.format(k,list(indices.keys())))
+		if numpy.isfinite(indices[k][1])==False: noiseFlag=False
+
+# compute zeta
+	tio_ref = numpy.polyval(coeff,indices[cah2_name][0]+indices[cah3_name][0])
+	zeta = (1.-indices[tio5_name][0])/(1.-tio_ref)
+	e_zeta = numpy.nan
+	if noiseFlag == False:
+		tio_ref_samp = numpy.polyval(coeff,numpy.random.normal(indices[cah2_name][0],indices[cah2_name][1],nsamples)+numpy.random.normal(indices[cah3_name][0],indices[cah3_name][1],nsamples))
+		zeta_samp = (numpy.ones(nsamples)-numpy.random.normal(indices[tio5_name][0],indices[tio5_name][1],nsamples))/(numpy.ones(nsamples)-tio_ref_samp)
+		e_zeta = numpy.nanstd(zeta_samp)
+
+	return zeta, e_zeta
+
+
+def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',output='loglhalbol',nsamples=100,noiseFlag=False,verbose=ERROR_CHECKING,**kwargs):
+	"""
+	Determines LHa/Lbol using equivalent width and chi factor
+
+	Parameters
+	----------
+
+	Returns
+	-------
+	tuple of floats
+		Lha/Lbol value and its uncertainty
+
+	Examples
+	--------
+
+	TBD
+
+	See Also
+	--------
+
+	measureIndexSet : measures a set of spectral indices
+
+	""" 	
+
+# keyword parameters
+	for k in ['reference','set']: ref = kwargs.get(k,ref)
+
+
+# measure everything if this is a spectrum
+	if isinstance(inp,Spectrum):
+		spt = typeToNum(classifyTemplate(inp))
+		ew,e_ew = measureEW(inp,6563.,recenter=True,absorption=False)
+	elif isinstance(inp,str):
+		spt = typeToNum(inp)
+	elif isinstance(inp,int) or isinstance(inp,float):
+		spt = copy.deepcopy(inp)
+	else: raise ValueError('Input parameter should be a Spectrum object or spectral type; you passed a {}'.format(type(inp)))
+
+# check ew & ew_unc
+	if ew == 0. or numpy.isfinite(ew)==False: output = 'chi'
+	if ew < 0.: ew = numpy.absolute(ew)
+
+# compute chi
+# check ref is in CHI_RELATIONS
+	tmp = checkDict(ref,CHI_RELATIONS)
+	if tmp==False: raise ValueError('Reference {} is not one of the predefined calibrations: {}'.format(ref,list(CHI_RELATIONS.keys())))
+	if verbose: print('Determining chi using the {} relation (bibcode: {})'.format(tmp,CHI_RELATIONS[tmp]['bibcode']))
+# assuming interpolation; will need to generalize for fits
+	chi_spt = CHI_RELATIONS[tmp]['spt']
+	chi_val = CHI_RELATIONS[tmp]['values']
+	chi_unc = CHI_RELATIONS[tmp]['scatter']
+	chi_scale = CHI_RELATIONS[tmp]['scale']
+	if spt-typeToNum('K0') < numpy.nanmin(chi_spt) or spt-typeToNum('K0') > numpy.nanmax(chi_spt): 
+		print('Spectral type {} is outside range for {} relation: {} to {}'.format(typeToNum(spt),tmp,typeToNum(numpy.nanmin(chi_spt)+typeToNum('K0')),typeToNum(numpy.nanmax(chi_spt)+typeToNum('K0'))))
+		return numpy.nan, numpy.nan
+	f = interp1d(chi_spt,chi_val)
+	chi = f(spt-typeToNum('K0'))*chi_scale
+	f = interp1d(chi_spt,chi_unc)
+	e_chi = f(spt-typeToNum('K0'))*chi_scale
+	if verbose: print('chi = {}+/-{}'.format(chi,e_chi))
+	if output=='chi': return chi, e_chi
+
+# compute LHa/Lbol
+	if isUnit(ew): ew = ew.to(u.Angstrom).value
+	if isUnit(e_ew): e_ew = e_ew.to(u.Angstrom).value
+	lhalbol = chi*ew
+	e_lhalbol = numpy.nan
+	if e_ew<= 0.or e_chi<=0 or numpy.isfinite(e_ew)==False or numpy.isfinite(e_chi)==False: noiseFlag=True
+	if noiseFlag==False:
+		samp = numpy.random.normal(chi,e_chi,nsamples)*numpy.random.normal(ew,e_ew,nsamples)
+		e_lhalbol = numpy.nanstd(samp)
+
+	if verbose: print('LHa/Lbol = {}+/-{}'.format(lhalbol,e_lhalbol))
+	if output=='lhalbol': return lhalbol, e_lhalbol
+	else: return numpy.log10(lhalbol), (e_lhalbol/lhalbol)/numpy.log(10)
 
 
 
