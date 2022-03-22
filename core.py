@@ -3,12 +3,10 @@ from __future__ import print_function
 
 # WORKING COPY OF KAST REDUCTION CODE
 # THINGS THAT NEED FIXING
-# - flux calibration isn't quite right - not returning a G star to a G star (esp in blue)
 # - fix flux calibration "wiggle" at red end of blue dispersion
 # - documentation
 # - function docstrings
 # - if output dictionary exists, won't do anything! -> can't used saved files
-# - enlarge xticks yticks in output plots
 
 # imports - internal
 import copy
@@ -44,9 +42,15 @@ if sys.version_info.major == 2:	 # switch for those using python 3
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2021.11.06'
+VERSION = '2022.03.22'
 __version__ = VERSION
 GITHUB_URL = 'https://github.com/aburgasser/kastredux/'
+AUTHORS = [
+	'Adam Burgasser (PI)',
+	'Ryan Low',]
+EMAIL = 'aburgasser@ucsd.edu'
+CITATION = ''
+BIBCODE = ''
 
 #set the CODE_PATH, either from set environment variable or from PYTHONPATH or from sys.path
 CODE_PATH = ''
@@ -90,11 +94,13 @@ print('Please report any errors are feature requests to our github page, {}\n\n'
 
 FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
 FLUXCALS = {
+	'FEIGE34': {'FILE' : 'ffeige34.dat'},
 	'FEIGE66': {'FILE' : 'ffeige66.dat'},
 	'FEIGE67': {'FILE' : 'ffeige67.dat'},
 	'FEIGE110': {'FILE' : 'ffeige110.dat'},
 	'HILTNER600': {'FILE' : 'fhilt600.dat'},
 	'LTT7987': {'FILE' : 'fltt7987.dat'},
+	'PG1708+602': {'FILE' : 'fpg1708602.dat'},
 }
 
 SPTSTDFOLDER = CODE_PATH+'/resources/spectral_standards/'
@@ -118,6 +124,7 @@ ERROR_CHECKING = False
 
 DEFAULT_WAVE_UNIT = u.Angstrom
 DEFAULT_FLUX_UNIT = u.erg/u.cm/u.cm/u.Angstrom/u.s
+DEFAULT_NO_UNIT = u.m/u.m
 
 INSTRUMENT_MODES = {
 	'RED': {'PREFIX': 'r', 'SUFFIX': '', 'ALTNAME': ['kast-red','r','rd','long','ir','nir'], 'NAME': 'KAST red', 'VERSION': 'kastr', 'ROTATE': True, 'TRIM': [],},
@@ -320,7 +327,7 @@ class Spectrum(object):
 	'''
 	def __init__(self,**kwargs):
 		core_attributes = {'instr': 'KAST red','name': 'Unknown source','wave': [],'flux': [],'unc': [],'variance':[],'background': [],'mask': [],'header': {},}
-		default_units = {'wave': DEFAULT_WAVE_UNIT,'flux':DEFAULT_FLUX_UNIT,'unc': DEFAULT_FLUX_UNIT,'background': DEFAULT_FLUX_UNIT,'variance': DEFAULT_FLUX_UNIT**2}
+#		default_units = {'wave': DEFAULT_WAVE_UNIT,'flux': DEFAULT_FLUX_UNIT,'unc': DEFAULT_FLUX_UNIT,'background': DEFAULT_FLUX_UNIT,'variance': DEFAULT_FLUX_UNIT**2}
 
 # set inputs
 		for k in list(core_attributes.keys()): setattr(self,k,core_attributes[k])
@@ -335,13 +342,13 @@ class Spectrum(object):
 		if len(self.background) == 0: self.background = numpy.zeros(len(self.flux))
 		if len(self.mask) == 0: self.mask = numpy.zeros(len(self.flux))
 # set units
-		for k in list(default_units.keys()):
-			if isUnit(getattr(self,k))==False: setattr(self,k,getattr(self,k)*default_units[k])
-		for k in list(default_units.keys()):
-			try:
-				setattr(self,k,getattr(self,k)).to(default_units[k])
-			except:
-				pass
+#		for k in list(default_units.keys()):
+#			if isUnit(getattr(self,k))==False: setattr(self,k,getattr(self,k)*default_units[k])
+#		for k in list(default_units.keys()):
+#			try:
+#				setattr(self,k,getattr(self,k)).to(default_units[k])
+#			except:
+#				pass
 # clean up
 		self.original = copy.deepcopy(self)
 		self.history = ['{} spectrum of {} successfully loaded'.format(self.instr,self.name)]
@@ -374,23 +381,19 @@ class Spectrum(object):
 		:Purpose: Cleans up spectrum elements to make sure they are properly configured
 		'''
 # set up units
-		try: funit = self.flux.unit
-		except: funit = DEFAULT_FLUX_UNIT
-		try: wunit = self.wave.unit
-		except: wunit = DEFAULT_WAVE_UNIT
+#		try: funit = self.flux.unit
+#		except: funit = DEFAULT_FLUX_UNIT
+#		try: wunit = self.wave.unit
+#		except: wunit = DEFAULT_WAVE_UNIT
 
 # clean wavelength vector
-		if isUnit(self.wave):
-			self.wave = numpy.array(self.wave.value)*wunit
-		else:
-			self.wave = numpy.array(self.wave)*wunit
+		try: self.wave = self.wave.to(DEFAULT_WAVE_UNIT)
+		except: pass
 
 # clean flux vector
 		for k in ['flux','unc','background']:
-			if isUnit(getattr(self,k)):
-				setattr(self,k,numpy.array(getattr(self,k).value)*funit)
-			else:
-				setattr(self,k,numpy.array(getattr(self,k))*funit)
+			try: setattr(self,k,getattr(self,k).to(DEFAULT_FLUX_UNIT))
+			except: pass
 # set variance
 		self.variance = self.unc**2
 # need to: 
@@ -1148,6 +1151,9 @@ def numberList(numstr,sort=False):
 
 def typeToNum(input, prefix='',suffix='',verbose=ERROR_CHECKING):
 	'''
+
+	*** UPDATE DOCSTRING ****
+
 	:Purpose: 
 
 		Converts between string and numeric spectral types, with the option of specifying the class prefix/suffix and uncertainty tags
@@ -1327,6 +1333,7 @@ def readSpectrum(filename,file_type='',delimiter='\s+',comment='#',columns=['wav
 			if len(d[:,0])>2:
 				for i in range(2,numpy.min([len(columns),len(d[:,0])])):
 					setattr(sp,columns[i],d[i,:])
+					if columns[i]=='unc' or columns[i]=='background': setattr(sp,columns[i],d[i,:]*flux_unit)
 		sp.clean()
 
 	else:
@@ -2163,7 +2170,7 @@ def spatialProfile(im,cntr=-1,window=10,verbose=ERROR_CHECKING,plot_file=''):
 
 
 
-def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wnd=5,bck_wnd=[10,20],subtract_background=True,verbose=ERROR_CHECKING,plot_file='',center_kwargs={},**kwargs):
+def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wnd=5,bck_wnd=[10,20],subtract_background=True,verbose=ERROR_CHECKING,plot_file='',center_kwargs={},median=False,**kwargs):
 	'''
 	Purpose:
 		Extracts spectrum from science image; can be done with pre-determined trace, 
@@ -2215,8 +2222,9 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 
 # some method presets
 #	if verbose==True: print('input profile length =  {}'.format(len(profile)))
-	if method.lower()=='arc':
+	if method.lower()=='arc' or method.lower()=='flat':
 		subtract_background = False
+		median = True
 	if method.lower()=='optimal' and len(profile)==0:
 		profile = spatialProfile(im,cntr=cntr,window=src_wnd)
 	elif method.lower()=='boxcar' or len(profile)==0:
@@ -2267,17 +2275,23 @@ def extractSpectrum(im,var=[],mask=[],method='optimal',cntr=-1,profile=[],src_wn
 		prf = copy.deepcopy(profile)
 		prf[msrc==1] = 0.
 # catch if we mask all pixels		
-		if numpy.nansum(prf)==0.: prf = copy.deepcopy(profile)
+		if numpy.nansum(prf)==0 or numpy.nansum(prf)==numpy.nan: prf = numpy.ones(len(profile))
+# catch negative profile values
+		prf[prf<0]==0
 # extract fluxes & uncertainties - not entirely sure about the variance calculation...
 		flx.append(numpy.nansum(src*prf)/numpy.nansum(prf))
 #
 # NOTE: THERE IS A PERSISTENT ERROR HERE
 #
 		unc.append((numpy.nansum(vsrc*prf)**0.5)/numpy.nansum(prf))
+# median extraction for arcs & flats
+		if median==True: 
+			flx[-1] = numpy.nanmedian(src)
+			unc[-1] = numpy.nanstd(src)
 	flx = numpy.array(flx)
 	unc = numpy.array(unc)
 
-	sp = Spectrum(flux=flx,unc=unc,background=bck,**kwargs)
+	sp = Spectrum(wave=numpy.arange(len(flx))*DEFAULT_NO_UNIT,flux=flx*DEFAULT_NO_UNIT,unc=unc*DEFAULT_NO_UNIT,background=bck*DEFAULT_NO_UNIT,**kwargs)
 
 	if plot_file != '':
 		x = numpy.arange(len(flx))
@@ -2593,13 +2607,13 @@ def waveCalibrateArcs(arcim,deep=[],dispersion='',mode='',trace=[],prior={},fit_
 
 
 
-def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],fluxcalfolder=FLUXCALFOLDER,calwaveunit=DEFAULT_WAVE_UNIT,calfluxunit=DEFAULT_FLUX_UNIT,plot_file='',verbose=ERROR_CHECKING):
+def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],fit_scale='linear',fluxcalfolder=FLUXCALFOLDER,calwaveunit=DEFAULT_WAVE_UNIT,calfluxunit=DEFAULT_FLUX_UNIT,plot_file='',verbose=ERROR_CHECKING):
 	'''
 	Uses spectrum of flux calibrator to determine the flux calibration correction
 	Input: flux cal spectrum, flux cal name
 	Output: dictionary containing  observed to physical flux correction, fit diagnostics
 	'''
-	calscalefactor = 1.e-16
+	calscalefactor = 1.
 	if name.upper() not in list(FLUXCALS.keys()):
 		raise ValueError('Flux standard {} is not present in flux calibration library; those sources are {}'.format(name,list(FLUXCALS.keys())))
 	calfile = '{}/{}'.format(fluxcalfolder,FLUXCALS[name.upper()]['FILE'])
@@ -2607,25 +2621,35 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 		raise ValueError('Cannot find flux standard file {} please check your paths'.format(calfile))
 # read in flux cal and compute ratio
 	fcal = readSpectrum(calfile,flux_unit=calfluxunit,wave_unit=calwaveunit)
+#	fcal.normalize()
 	ratio = fcal/fluxsp
 	if len(fit_range) == 0: fit_range = [numpy.nanmin(fcal.wave.value),numpy.nanmax(fcal.wave.value)]
 
-# iteratively fit LOG of ratio with rejection
+# iteratively fit ratio with rejection
 	mask = numpy.zeros(len(ratio.wave))
-	mask[ratio.flux<=0] = 1
+	mask[ratio.flux.value<=0] = 1
 	mask[ratio.wave.value<fit_range[0]] = 1
 	mask[ratio.wave.value>fit_range[1]] = 1
-	mask[numpy.isfinite(ratio.flux)==False] = 1
+	mask[numpy.isfinite(ratio.flux.value)==False] = 1
 	for i in range(fit_cycle):
-		p = numpy.polyfit(ratio.wave.value[mask==0],numpy.log10(ratio.flux[mask==0]),fit_order)
-		diff = numpy.log10(ratio.flux)-numpy.polyval(p,ratio.wave.value)
+		if fit_scale=='log':
+			p = numpy.polyfit(ratio.wave.value[mask==0],numpy.log10(ratio.flux.value[mask==0]),fit_order)
+			diff = numpy.log10(ratio.flux.value)-numpy.polyval(p,ratio.wave.value)
+#			p[-1]=p[-1]+numpy.log10(calscalefactor)
+		else:
+			p = numpy.polyfit(ratio.wave.value[mask==0],ratio.flux[mask==0],fit_order)
+			diff = ratio.flux.value-numpy.polyval(p,ratio.wave.value)
 		mask[numpy.absolute(diff)>(sclip*numpy.nanstd(diff[mask==0]))] = 1
-	p[-1]=p[-1]+numpy.log10(calscalefactor)
+	# if fit_scale=='log':
+	# 	p[-1]=p[-1]+numpy.log10(calscalefactor)
+	# else:
+	# 	p[-1]=p[-1]+numpy.log10(calscalefactor)
 
 # generate reporting structure	
 	cal_flux = {}
 	cal_flux['COEFF'] = p
-	cal_flux['CORRECTION'] = 10.**numpy.polyval(p,fluxsp.wave.value)
+	if fit_scale=='log': cal_flux['CORRECTION'] = 10.**numpy.polyval(p,fluxsp.wave.value)
+	else: cal_flux['CORRECTION'] = numpy.polyval(p,fluxsp.wave.value)
 	cal_flux['UNIT'] = calfluxunit
 	cal_flux['FITBANDS'] = len(mask[mask==0])
 	cal_flux['NAME'] = name
@@ -2635,9 +2659,14 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 		plt.clf()
 		plt.figure(figsize=[8,8])
 		plt.subplot(211)
-		plt.semilogy(ratio.wave.value,ratio.flux.value,'k.',alpha=0.5)
-		plt.semilogy(ratio.wave.value[mask==0],ratio.flux.value[mask==0],'bo')
-		plt.semilogy(fluxsp.wave.value,(10.**numpy.polyval(p,fluxsp.wave.value))/calscalefactor,'m--')
+		if fit_scale=='log':
+			plt.semilogy(ratio.wave.value,ratio.flux.value,'k.',alpha=0.5)
+			plt.semilogy(ratio.wave.value[mask==0],ratio.flux.value[mask==0],'bo')
+			plt.semilogy(fluxsp.wave.value,(10.**numpy.polyval(p,fluxsp.wave.value)),'m--')
+		else:
+			plt.plot(ratio.wave.value,ratio.flux.value,'k.',alpha=0.5)
+			plt.plot(ratio.wave.value[mask==0],ratio.flux.value[mask==0],'bo')
+			plt.plot(fluxsp.wave.value,numpy.polyval(p,fluxsp.wave.value),'m--')
 		plt.legend(['Ratio','RMS={:.2f} dex'.format(numpy.nanstd(diff)),'Fit'])
 		plt.xticks(fontsize=16)
 		plt.yticks(fontsize=16)
@@ -2646,10 +2675,11 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 		plt.ylabel('Calibrator/Observed',fontsize=16)
 		plt.subplot(212)
 #		yrng=[0,1.2]
-		plt.plot(fcal.wave.value,fcal.flux.value*calscalefactor,'k-')
-		f = interp1d(fcal.wave.value,fcal.flux.value*calscalefactor,bounds_error=False,fill_value=0.)
+		plt.plot(fcal.wave.value,fcal.flux.value,'k-')
+		f = interp1d(fcal.wave.value,fcal.flux.value,bounds_error=False,fill_value=0.)
 		plt.plot(fluxsp.wave.value,fluxsp.flux.value*numpy.nanmedian(f(fluxsp.wave.value))/numpy.nanmedian(fluxsp.flux.value),'b-')
-		plt.plot(fluxsp.wave.value,fluxsp.flux.value*(10.**numpy.polyval(p,fluxsp.wave.value)),'m-')
+		if fit_scale=='log': plt.plot(fluxsp.wave.value,fluxsp.flux.value*(10.**numpy.polyval(p,fluxsp.wave.value)),'m-')
+		else: plt.plot(fluxsp.wave.value,fluxsp.flux.value*numpy.polyval(p,fluxsp.wave.value),'m-')
 		plt.legend(['Calibration Spectrum of {}'.format(name),'Observed Spectrum (scaled)','Corrected Spectrum'])
 		plt.xticks(fontsize=16)
 		plt.yticks(fontsize=16)
@@ -2667,7 +2697,7 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],flu
 	return cal_flux
 
 
-def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,sclip=3.,smooth=5,snlimit=30,fit_range=[],calfolder=TELLSTDFOLDER,stdfile='',plot_file='',verbose=ERROR_CHECKING):
+def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,fit_scale='linear',sclip=3.,smooth=5,snlimit=30,fit_range=[],calfolder=TELLSTDFOLDER,stdfile='',plot_file='',verbose=ERROR_CHECKING):
 	'''
 	Uses spectrum of telluric calibrator to determine a second-order flux calibration correction
 	Input: telluric cal spectrum, spt
@@ -3131,7 +3161,12 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		bck_wnd = copy.deepcopy(bck_wnd0)
 		if 'BACK' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): bck_wnd = redux['PARAMETERS']['FLUXCAL'][ref]['BACK']
 		fit_order = copy.deepcopy(fit_order0)
-		if 'FIT_ORDER' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): fit_order = redux['PARAMETERS']['FLUXCAL'][ref]['FIT_ORDER']
+		if 'FIT_ORDER' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): fit_order = int(redux['PARAMETERS']['FLUXCAL'][ref]['FIT_ORDER'])
+		flux_fit_scale = 'linear'
+		if 'FIT_SCALE' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): flux_fit_scale = redux['PARAMETERS']['FLUXCAL'][ref]['FIT_SCALE']
+		fit_range = [6000,9000]
+		if redux['PARAMETERS']['MODE'] == 'BLUE': fit_range=[3500,5550]
+		if 'FIT_RANGE' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): fit_range = redux['PARAMETERS']['FLUXCAL'][ref]['FIT_RANGE']
 # reduce data, determine trace and extract spectrum
 		imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd=hd)
 		cntr = findPeak(imr,cntr=cntr)
@@ -3139,6 +3174,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		imrect = rectify(imr,trace)
 		varrect = rectify(var,trace)
 		maskrect = rectify(redux['MASK'],trace)
+		flatrect = rectify(redux['FLAT'],trace)
 		cntr = findPeak(imrect,cntr=cntr,window=src_wnd,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['MODE']))
 #		profile = spatialProfile(imrect,cntr=cntr,window=src_wnd)
 #		profile = numpy.ones(int(2*src_wnd+1))
@@ -3150,13 +3186,10 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		arcrect = rectify(arcdp,trace)
 		arcrecal = waveCalibrateArcs(arcrect,cntr=cntr,prior=redux['CAL_WAVE'],mode=redux['PARAMETERS']['MODE'],plot_file='{}/diagnostic_wavecal_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],redux['PARAMETERS']['MODE']))
 		spflx.applyWaveCal(arcrecal)
-		if redux['PARAMETERS']['MODE'] == 'BLUE':
-			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],fit_order=fit_order,fit_range=[3500.,5550.],plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
-		else:
-			redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],fit_order=fit_order,plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
+		redux['CAL_FLUX'] = fluxCalibrate(spflx,redux['PARAMETERS']['FLUXCAL'][ref]['NAME'],fit_order=fit_order,fit_scale=flux_fit_scale,fit_range=fit_range,plot_file='{}/diagnostic_fluxcal_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']))
 		redux['CAL_FLUX']['TRACE'] = trace
 #		redux['CAL_FLUX']['PROFILE'] = profile
-		spflx.applyFluxCal(redux['CAL_FLUX'],log=True)
+		spflx.applyFluxCal(redux['CAL_FLUX'],log=(flux_fit_scale == 'log'))
 		redux[redux['PARAMETERS']['FLUXCAL'][ref]['NAME']] = spflx
 # save this to pickle file
 		f = open('{}/cal_flux_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],redux['PARAMETERS']['MODE']),'wb')
@@ -3185,6 +3218,8 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			if 'WINDOW' in list(redux['PARAMETERS']['TELLURIC'][tstar].keys()): src_wnd = redux['PARAMETERS']['TELLURIC'][tstar]['WINDOW']
 			bck_wnd = copy.deepcopy(bck_wnd0)
 			if 'BACK' in list(redux['PARAMETERS']['TELLURIC'][tstar].keys()): bck_wnd = redux['PARAMETERS']['TELLURIC'][tstar]['BACK']
+			fit_order = 4
+			if 'FIT_ORDER' in list(redux['PARAMETERS']['TELLURIC'][tstar].keys()): fit_order = int(redux['PARAMETERS']['TELLURIC'][tstar]['FIT_ORDER'])
 # reduce imaging data
 			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd=hd)
 #			imr,var = reduceScienceImage(im,redux['BIAS'],redux['FLAT'],redux['MASK'],hd['EXPTIME'])
@@ -3194,6 +3229,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			imrect = rectify(imr,trace)
 			varrect = rectify(var,trace)
 			maskrect = rectify(redux['MASK'],trace)
+			flatrect = rectify(redux['FLAT'],trace)
 # find center
 			cntr = findPeak(imrect,cntr=cntr,window=src_wnd,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 # make profile
@@ -3211,10 +3247,10 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			spflx.applyWaveCal(arcrecal)
 #			spflx.applyWaveCal(redux['CAL_WAVE'])
 # apply flux calibration
-			spflx.applyFluxCal(redux['CAL_FLUX'],debug=False,log=True)
+			spflx.applyFluxCal(redux['CAL_FLUX'],debug=False,log=(flux_fit_scale=='log'))
 # compute telluric corection
 #			print(tstar,redux['PARAMETERS']['TELLURIC'][tstar]['SPT'])
-			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,spt=redux['PARAMETERS']['TELLURIC'][tstar]['SPT'],plot_file='{}/diagnostic_telluric_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
+			redux['CAL_TELL'][tstar] = telluricCalibrate(spflx,spt=redux['PARAMETERS']['TELLURIC'][tstar]['SPT'],fit_order=fit_order,plot_file='{}/diagnostic_telluric_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 			redux['CAL_TELL'][tstar]['NAME'] = tstar
 			redux['CAL_TELL'][tstar]['TRACE'] = trace
 #			redux['CAL_TELL'][tstar]['PROFILE'] = profile
@@ -3237,7 +3273,9 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		if verbose==True: print('\nComputing second order flux corrections from telluric standards')
 		redux['CAL_REFLUX'] = {}
 		for tstar in list(redux['PARAMETERS']['TELLURIC'].keys()):
-			redux['CAL_REFLUX'][tstar] = fluxReCalibrate(redux[tstar],spt=redux['PARAMETERS']['TELLURIC'][tstar]['SPT'],plot_file='{}/diagnostic_reflux_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
+			fit_order = 3
+			if 'FIT_ORDER' in list(redux['PARAMETERS']['TELLURIC'][tstar].keys()): fit_order = int(redux['PARAMETERS']['TELLURIC'][tstar]['FIT_ORDER'])
+			redux['CAL_REFLUX'][tstar] = fluxReCalibrate(redux[tstar],spt=redux['PARAMETERS']['TELLURIC'][tstar]['SPT'],fit_order=fit_order,plot_file='{}/diagnostic_reflux_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']))
 # save this to pickle file
 			f = open('{}/cal_reflux_{}_{}.pkl'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],tstar,redux['PARAMETERS']['MODE']),'wb')
 			pickle.dump(redux['CAL_REFLUX'][tstar],f)
@@ -3293,6 +3331,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 			imrect = rectify(imr,trace)
 			varrect = rectify(var,trace)
 			maskrect = rectify(redux['MASK'],trace)
+			flatrect = rectify(redux['FLAT'],trace)
 # recenter?
 			if cflag == True or cntr<0: 
 				cntr = findPeak(imrect,cntr=cntr,window=src_wnd,plot_file='{}/diagnostic_profile_{}_{}.pdf'.format(redux['PARAMETERS']['REDUCTION_FOLDER'],src,redux['PARAMETERS']['MODE']))
@@ -3321,7 +3360,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 # apply flux calibration
 			if 'CAL_FLUX' in list(redux.keys()): 
 				print('Applying flux calibration')
-				spflx.applyFluxCal(redux['CAL_FLUX'],log=True)
+				spflx.applyFluxCal(redux['CAL_FLUX'],log=(flux_fit_scale=='log'))
 			else: print('Warning: no flux calibration applied')
 # apply second order flux calibration
 # note: could also do this with wave and correction keywords with applyTelluricCal
@@ -3360,7 +3399,16 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 
 # PROGRAM CONSTANTS FOR ANALYSIS
 INDEX_SETS = {
-	'kirkpatrick1999': {'altname': ['kirkpatrick','kirkpatrick19','kir99'], 'bibcode': '1999ApJ...519..802K', 'indices': {\
+	'kirkpatrick1991': {'altname': ['kirkpatrick91','kir91'], 'bibcode': '1991ApJS...77..417K', 'indices': {\
+		'K91-A': {'ranges': ([7020,7050]*u.Angstrom,[6960,6990]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'K91-B': {'ranges': ([7375,7385]*u.Angstrom,[7353,7363]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'K91-C': {'ranges': ([8100,8130]*u.Angstrom,[8174,8204]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'K91-D': {'ranges': ([8567,8577]*u.Angstrom,[8537,8547]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+	}},\
+	'kirkpatrick1995': {'altname': ['kirkpatrick95','kir95'], 'bibcode': '1995AJ....109..797K', 'indices': {\
+		'VO7445': {'ranges': ([7350,7400]*u.Angstrom,[7510,7560]*u.Angstrom,[7420,7470]*u.Angstrom),'scaling':(0.5625,0.4375,1.0), 'method': 'line_scaling', 'sample': 'integrate'},\
+	}},\
+	'kirkpatrick1999': {'altname': ['kirkpatrick','kirkpatrick99','kir99'], 'bibcode': '1999ApJ...519..802K', 'indices': {\
 		'Rb-a': {'ranges': ([.77752,.77852]*u.micron,[.78152,.78252]*u.micron,[.77952,.78052]*u.micron), 'method': 'line', 'sample': 'integrate'},\
 		'Rb-b': {'ranges': ([.79226,.79326]*u.micron,[.79626,.79726]*u.micron,[.79426,.79526]*u.micron), 'method': 'line', 'sample': 'integrate'},\
 		'Na-a': {'ranges': ([.81533,.81633]*u.micron,[.81783,.81883]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
@@ -3399,13 +3447,21 @@ INDEX_SETS = {
 		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 	}},\
+    'hawley2002': {'altname': ['hawley02','hawley','haw02'], 'bibcode': '2002AJ....123.3409H', 'indices': {\
+		'VO-7434': {'ranges': ([7430,7470]*u.Angstrom,[7550,7570]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'VO-7912': {'ranges': ([7900,7980]*u.Angstrom,[8400,8420]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'Na-8190': {'ranges': ([8140,8165]*u.Angstrom,[8173,8210]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'TiO-8440': {'ranges': ([8440,8470]*u.Angstrom,[8400,8420]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'Color-1': {'ranges': ([8900,9100]*u.Angstrom,[7350,7550]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+	}},\
 	'lepine2003': {'altname': ['lepine','lepine03','lep03'], 'bibcode': '', 'indices': {\
 		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avedenom','sample': 'average'},\
 		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'VO1': {'ranges': [[7430, 7470]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO6': {'ranges': [[7550,7570]*u.Angstrom,[7745,7765]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+#		'TiO6': {'ranges': [[7550,7570]*u.Angstrom,[7745,7765]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO6': {'ranges': [[7745,7765]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'VO2': {'ranges': [[7920, 7960]*u.Angstrom,[8440, 8470]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'TiO7': {'ranges': [[8440, 8470]*u.Angstrom,[8400, 8420]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'Color-M': {'ranges': [[8105, 8155]*u.Angstrom,[6510, 6560]*u.Angstrom],'method': 'ratio','sample': 'average'},\
@@ -3415,27 +3471,75 @@ INDEX_SETS = {
 		'TiO2': {'ranges': [[7058, 7061]*u.Angstrom,[7043, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'TiO3': {'ranges': [[7092, 7097]*u.Angstrom,[7079, 7084]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'TiO4': {'ranges': [[7130, 7135]*u.Angstrom,[7115, 7120]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO5': {'feature': [[7126, 7135]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO5': {'ranges': [[7126, 7135]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avdenom','sample': 'average'},\
 		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'CaOH': {'ranges': [[6230, 6240]*u.Angstrom,[6345, 6354]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 	}},\
 	'burgasser2003': {'altname': ['burgasser','burgasser03','bur03'], 'bibcode': '', 'indices': {\
-		'CsI-A': {'range': [[8496.1, 8506.1]*u.Angstrom, [8536.1, 8546.1]*u.Angstrom,[8516.1, 8626.1]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
-		'CsI-B': {'range': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
-		'H2O': {'range': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'CrH-A': {'range': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'CrH-B': {'range': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'FeH-A': {'range': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'FeH-B': {'range': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'Color-e': {'range': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CsI-A': {'ranges': [[8496.1, 8506.1]*u.Angstrom, [8536.1, 8546.1]*u.Angstrom,[8516.1, 8626.1]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+		'CsI-B': {'ranges': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+		'H2O': {'ranges': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'Color-e': {'ranges': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'burgasser2003': {'altname': ['burgasser','burgasser03','bur03'], 'bibcode': '', 'indices': {\
+		'CsI-A': {'ranges': [[8496.1, 8506.1]*u.Angstrom, [8536.1, 8546.1]*u.Angstrom,[8516.1, 8626.1]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+		'CsI-B': {'ranges': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+		'H2O': {'ranges': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'Color-e': {'ranges': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'riddick2006': {'altname': ['riddick','riddick06','rid06'], 'bibcode': '', 'indices': {\
+		'R1': {'ranges': [[8025,8130]*u.Angstrom, [8015,8025]*u.Angstrom],'method': 'ratio','sample': 'median'},\
+		'R2': {'ranges': [[8145,8460]*u.Angstrom, [8460,8470]*u.Angstrom],'method': 'ratio','sample': 'median'},\
+		'R3': {'ranges': [[8025,8130]*u.Angstrom, [8145,8460]*u.Angstrom,[8015,8025]*u.Angstrom, [8460,8470]*u.Angstrom],'method': 'doublesum','sample': 'median'},\
+		'R4': {'ranges': [[8854,8857]*u.Angstrom, [8454,8458]*u.Angstrom,[8873,8878]*u.Angstrom],'method': 'inverse_line','sample': 'median'},\
+	}},\
+	'stauffer1999': {'altname': ['stauffer','stauffer99','sta99'], 'bibcode': '', 'indices': {\
+		'c81': {'ranges': [[8115,8165]*u.Angstrom, [7865,7915]*u.Angstrom,[8490,8540]*u.Angstrom],'method': 'inverse_line','sample': 'median'},\
+	}},\
+	'slesnick2006': {'altname': ['slesnick','slesnick06','sle06'], 'bibcode': '', 'indices': {\
+		'TiO-7140': {'ranges': [[7010,7060]*u.Angstrom, [7115,7165]*u.Angstrom],'method': 'ratio','sample': 'median'},\
+		'TiO-8465': {'ranges': [[8405,8425]*u.Angstrom, [8455,8475]*u.Angstrom],'method': 'ratio','sample': 'median'},\
+		'Na-8189': {'ranges': [[8174,8204]*u.Angstrom, [8135,8165]*u.Angstrom],'method': 'ratio','sample': 'median'},\
 	}},\
 }
 
+EW_SETS = {
+	'mann2013': {'altname': ['mann','mann13','man13'], 'reference': 'Mann et al. (2013)', 'bibcode': '2013AJ....145...52M', 'continuum_fit_order': 1, 'features': {\
+		'f01': {'linecenter': 0.4648*u.micron,'width': 0.00115*u.micron, 'recenter': False,'continuum': [0.461,0.4625,0.468,0.47]*u.micron},\
+		'f02': {'linecenter': 0.5608*u.micron,'width': 0.0010*u.micron,'recenter': False,'continuum': [0.5269,0.5299,0.566,0.5675]*u.micron},\
+		'f03': {'linecenter': 0.6118*u.micron,'width': 0.0010*u.micron, 'recenter': False,'continuum': [0.566,0.5675,0.6586,0.6607]*u.micron},\
+		'f04': {'linecenter': 0.6232*u.micron,'width': 0.0010*u.micron, 'recenter': False,'continuum': [0.566,0.5675,0.6586,0.6607]*u.micron},\
+		'f05': {'linecenter': 0.6416*u.micron,'width': 0.00205*u.micron, 'recenter': False,'continuum': [0.566,0.5675,0.6586,0.6607]*u.micron},\
+		'f06': {'linecenter': 0.7540*u.micron,'width': 0.0010*u.micron, 'recenter': False,'continuum': [0.7390,0.75,0.81,0.816]*u.micron},\
+		'f07': {'linecenter': 0.8208*u.micron,'width': 0.00175*u.micron, 'recenter': False,'continuum': [0.81,0.816,0.823,0.83]*u.micron},\
+		'f08': {'linecenter': 0.8684*u.micron,'width': 0.0013*u.micron, 'recenter': False,'continuum': [0.859,0.892,0.91,0.912]*u.micron},\
+	}},
+}
+
 ZETA_RELATIONS = {
-	'lepine2007': {'altname': ['lepine','lepine07','lep07'], 'reference': 'Lepine et al. (2007)','bibcode':'2007ApJ...669.1235L', 'coeff': [-0.164,0.67,-0.118,-0.05],'range': []},
-	'dhital2011': {'altname': ['dhital','dhital11','dhi11'], 'reference': 'Dhital et al. (2011)','bibcode':'', 'coeff': [-0.005,-0.183,0.694,-0.127,-0.047],'range': []},
+	'lepine2007': {'altname': ['lepine','lepine07','lep07'], 'reference': 'Lepine et al. (2007)','bibcode':'2007ApJ...669.1235L', 'coeff': [-0.164,0.67,-0.118,-0.05],'range': [], 'classes': [0.825,0.5,0.2]},
+	'lepine2013': {'altname': ['lepine13','lep13'], 'reference': 'Lepine et al. (2013)','bibcode':'', 'coeff': [-0.588,2.211,-1.906,0.622],'range': [], 'classes': [0.825,0.5,0.2]},
+	'dhital2012': {'altname': ['dhital','dhital12','dhi12'], 'reference': 'Dhital et al. (2012)','bibcode':'2012AJ....143...67D', 'coeff': [-0.005,-0.183,0.694,-0.127,-0.047],'range': [], 'classes': [0.825,0.5,0.2]},
+	'zhang2019': {'altname': ['zhang','zhang19','zha19'], 'reference': 'Zhang et al. (2019)','bibcode':'', 'coeff': [-0.1069,0.3863,0.312,-0.2849],'range': [], 'classes': [0.75,0.5,0.2]},
+}
+
+METALLICITY_RELATIONS = {
+	'mann2013': {'altname': ['mann','mann13','man13'], 'reference': 'Mann et al. (2013)', 'bibcode': '2013AJ....145...52M', 'features':['mann2013','hawley2002'],'relations': {
+		'feh-early': {'features': ['f07','f01','f02','Color-1'],'coeff': [0.53,0.26,-0.16,-0.784,-0.34], 'unc': 0.13, 'range': [typeToNum('K5.5'),typeToNum('M2')]},
+		'mh-early': {'features': ['f07','f01','f08','Color-1'],'coeff': [0.38,0.21,0.29,-0.504,-0.79], 'unc': 0.11, 'range': [typeToNum('K5.5'),typeToNum('M2')]},
+		'feh-late': {'features': ['f05','f08','f07','f03','Color-1'],'coeff': [-0.20,0.48,0.24,0.14,-0.204,-0.32], 'unc': 0.14, 'range': [typeToNum('M2'),typeToNum('M6')]},
+		'mh-late': {'features': ['f05','f04','f06','Color-1'],'coeff': [-0.065,-0.071,-0.30,0.719,-0.24], 'unc': 0.11, 'range': [typeToNum('M2'),typeToNum('M6')]},
+	}},
 }
 
 EW_LINES = {
@@ -3451,17 +3555,67 @@ EW_LINES = {
 }
 
 CHI_RELATIONS = {
-    'schmidt2014': {'altname': ['schmidt','schmidt14'], 'reference': 'Schmidt et al. (2014)','bibcode':'2014PASP..126..642S', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-6,
-        'spt': [17,18,19,20,21,22,23,24,25,26,27], \
-        'values': [10.28,4.26,2.52,1.98,2.25,2.11,1.67,1.16,1.46,1.23,0.73],\
-        'scatter': [3.13,1.18,0.58,0.27,0.11,0.36,0.22,0.3,0.28,0.3,0.3],\
-        },
-    'douglas2014': {'altname': ['douglas','douglas14'], 'reference': 'Douglas et al. (2014)','bibcode':'2014ApJ...795..161D', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-5,
-        'spt': [10,11,12,13,14,15,16,17,18,19], \
-        'values': [6.6453,6.0334,5.2658,4.4872,3.5926,2.4768,1.7363,1.2057,0.6122,0.3522],\
-        'scatter': [0.6207,0.5326,0.5963,0.4967,0.5297,0.4860,0.3475,0.3267,0.2053,0.1432],\
-        },
+	'schmidt2014': {'altname': ['schmidt','schmidt14'], 'reference': 'Schmidt et al. (2014)','bibcode':'2014PASP..126..642S', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-6,
+		'spt': [17,18,19,20,21,22,23,24,25,26,27], \
+		'values': [10.28,4.26,2.52,1.98,2.25,2.11,1.67,1.16,1.46,1.23,0.73],\
+		'scatter': [3.13,1.18,0.58,0.27,0.11,0.36,0.22,0.3,0.28,0.3,0.3],\
+		},
+	'douglas2014': {'altname': ['douglas','douglas14'], 'reference': 'Douglas et al. (2014)','bibcode':'2014ApJ...795..161D', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-5,
+		'spt': [10,11,12,13,14,15,16,17,18,19], \
+		'values': [6.6453,6.0334,5.2658,4.4872,3.5926,2.4768,1.7363,1.2057,0.6122,0.3522],\
+		'scatter': [0.6207,0.5326,0.5963,0.4967,0.5297,0.4860,0.3475,0.3267,0.2053,0.1432],\
+		},
 }
+
+INDEX_CLASSIFICATION_RELATIONS = {
+	'reid1995': {'altname': ['reid','reid95','rei95'], 'bibcode': '1995AJ....110.1838R', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
+		'TiO5': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-10.775,8.2],'fitunc': 0.5,'offset':0,'log': False}, \
+	}},
+	'gizis1997': {'altname': ['gizis','gizis97','giz97'], 'bibcode': '1997AJ....113..806G', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
+		'TiO5': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-9.64,7.76],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH2': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-18.00,15.80],'fitunc': 0.5,'offset':0,'log': False}, \
+	}},
+	'martin1999': {'altname': ['martin','martin99','mar99','martin1999-m','martin-m','martin99-m','mar99-m'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['martin1999'], 'indices': {\
+		'PC3': {'range': [typeToNum('M2.5'),typeToNum('L1')], 'coeff': [-2.024,11.715,-6.685],'fitunc': 0.28,'offset':0,'log': False}, \
+	}},
+	'martin1999-l': {'altname': ['martin-l','martin99-l','mar99-l'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['martin1999'], 'indices': {\
+		'PC3': {'range': [typeToNum('L1'),typeToNum('L6')], 'coeff': [-0.047,1.181,8.557],'fitunc': 0.54,'offset':0,'log': False}, \
+	}},
+	'lepine2003': {'altname': ['lepine2003-dwarf','lepine','lepine03','lep03','lepine-d','lepine03-d','lep03-d'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
+		'CaH2': {'range': [typeToNum('M0'),typeToNum('M6')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': [typeToNum('M0'),typeToNum('M6')], 'coeff': [-18.00,15.80],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO5': {'range': [typeToNum('M0'),typeToNum('M6')], 'coeff': [-9.64,7.76],'fitunc': 0.5,'offset':0,'log': False}, \
+		'VO1': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [-30.5,32.2],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO6': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [-11.2,11.9],'fitunc': 0.5,'offset':0,'log': False}, \
+		'VO2': {'range': [typeToNum('M3'),typeToNum('M9')], 'coeff': [-10.5,12.4],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO7': {'range': [typeToNum('M3'),typeToNum('M9')], 'coeff': [-11.0,13.7],'fitunc': 0.5,'offset':0,'log': False}, \
+		'Color-M': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [7.5,1.6],'fitunc': 0.5,'offset':0,'log': True}, \
+	}},
+	'lepine2003-sd': {'altname': ['lepine-sd','lepine03-sd','lep03-sd'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
+		'CaH2': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [-16.02,13.78],'fitunc': 0.5,'offset':0,'log': False}, \
+		'Color-M': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [7.3,-0.6],'fitunc': 0.5,'offset':0,'log': True}, \
+	}},
+	'lepine2003-esd': {'altname': ['lepine-esd','lepine03-esd','lep03-esd'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
+		'CaH2': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [-13.47,11.50],'fitunc': 0.5,'offset':0,'log': False}, \
+		'Color-M': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [22,-4.1],'fitunc': 0.5,'offset':0,'log': True}, \
+	}},
+	'riddick2007': {'altname': ['riddick','riddick07','rid07'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['kirkpatrick1995','kirkpatrick1999','reid1995','stauffer1999','riddick2006','slesnick2006','lepine2003'], 'indices': {\
+		'VO7445': {'range': [typeToNum('M5'),typeToNum('M8')], 'coeff': [13.078,17.121,5.0881],'fitunc': 0.5,'offset':-0.982,'log': False}, \
+		'VO-a': {'range': [typeToNum('M5'),typeToNum('M8')], 'coeff': [6.7099,11.226,5.0705],'fitunc': 0.5,'offset':-0.982,'log': False}, \
+		'VO-b': {'range': [typeToNum('M3'),typeToNum('M8')], 'coeff': [-325.44,394.28,-156.53,29.469,3.4875],'fitunc': 0.5,'offset':-1.017,'log': False}, \
+		'VO2': {'range': [typeToNum('M3'),typeToNum('M8')], 'coeff': [-14.66,-8.3231,-7.9389,2.6102],'fitunc': 0.5,'offset':-0.963,'log': False}, \
+		'R1': {'range': [typeToNum('M25'),typeToNum('M8')], 'coeff': [60.755,-53.025,21.085,2.8078],'fitunc': 0.5,'offset':-1.044,'log': False}, \
+		'R2': {'range': [typeToNum('M3'),typeToNum('M8')], 'coeff': [8.5121,-14.105,10.503,2.9091],'fitunc': 0.5,'offset':-1.035,'log': False}, \
+		'R3': {'range': [typeToNum('M2.5'),typeToNum('M8')], 'coeff': [52.531,-47.679,19.708,2.8379],'fitunc': 0.5,'offset':-1.035,'log': False}, \
+		'TiO-8465': {'range': [typeToNum('M3'),typeToNum('M8')], 'coeff': [5.6765,-10.142,8.7311,3.2147],'fitunc': 0.5,'offset':-1.085,'log': False}, \
+		'c81': {'range': [typeToNum('M2.5'),typeToNum('M8')], 'coeff': [3.0567,-6.817,8.0558,2.4331],'fitunc': 0.5,'offset':-1.036,'log': False}, \
+	}},
+}
+
+
 
 # HELPFUL FUNCTIONS
 def padWhereArray(w,mx):
@@ -3713,7 +3867,7 @@ def initializeStandards(spt,sdss=True,folder=SPTSTDFOLDER,reset=False,sd=False,e
 				if verbose==True: print('Warning: cannot find a spectral standard for type {}'.format(s))
 	return
 
-def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6500,8800],verbose=ERROR_CHECKING,**kwargs):
+def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6500,8800],plot=False,verbose=ERROR_CHECKING,**kwargs):
 	'''
 	Classification program using templates from resource library
 	this is a simplified version of program
@@ -3734,12 +3888,12 @@ def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6500,8800],verbose=ERRO
 		if verbose==True: print('\t{}: {:.2f}'.format(SPTSTDS[s],st))
 	spt = stds[numpy.argmin(sts)]
 	if plot_file != '': st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,error_value=numpy.nan,plot=True,plot_file=plot_file,**kwargs)
-	else: st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,error_value=numpy.nan,plot=False,**kwargs)
+	else: st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,error_value=numpy.nan,plot=plot,**kwargs)
 
 	return spt
 
 
-def measureIndex(sp,ranges,sample='median',method='ratio',nsamples=100,noiseFlag=False,plot=False,verbose=ERROR_CHECKING,**pkwargs):
+def measureIndex(sp,ranges,sample='median',method='ratio',scaling=[],nsamples=100,noiseFlag=False,plot=False,verbose=ERROR_CHECKING,**pkwargs):
 	"""
 	Measures a spectral index on a spectrum based on defined methodology
 
@@ -3769,9 +3923,11 @@ def measureIndex(sp,ranges,sample='median',method='ratio',nsamples=100,noiseFlag
 			* 'single': returns range[0]
 			* 'line' or 'avenum': returns 0.5 * (range[0]+range[1])/range[2]
 			* 'inverse_line' or 'avedenum': returns 2 * range[0]/(range[1]+range[2])
+			* 'line_scaling': returns (A*range[0]+B*range[1])/C*range[2] where scaling=[A,B,C]
 			* 'change': returns 2 * (range[0]-range[1])/(range[0]+range[1])
 			* 'sumnum': returns (range[0]+range[1])/range[2] = 2 * line
 			* 'sumdenom': returns range[0]/(range[1]+range[2]) = 0.5 * inverse_line
+			* 'doublesum': returns (range[0]+range[1])/(range[2]+range[3])
 			* 'doubleratio': returns (range[0]/range[1])/(range[1]/range[2])
 			* 'allers': returns [range[2]*(lam0-lam1)/(lam2-lam1) + range[1]*(lam2-lam0)/(lam2-lam1)]/range[0]
 
@@ -3809,10 +3965,10 @@ def measureIndex(sp,ranges,sample='median',method='ratio',nsamples=100,noiseFlag
 # error checking on number of arguments provided
 	sample_types = ['integrate','sum','average','median','maximum','max','minimum','min']
 	method_types = ['ratio','single','line','inverse_line','change','avenum','avedenom','sumnum','sumdenom','doubleratio','allers']
-	if sample.lower() not in sample_types: raise ValueError('sample method {} not in allowed list: {}'.format(sample,sample_types))
-	if verbose: print('Using measurement method {}'.format(sample))
-	if method.lower() not in method_types: raise ValueError('index measurement method {} not in allowed list: {}'.format(method,method_types))
-	if verbose: print('Using index combination method {}'.format(method))
+	# if sample.lower() not in sample_types: raise ValueError('sample method {} not in allowed list: {}'.format(sample,sample_types))
+	# if verbose: print('Using measurement method {}'.format(sample))
+	# if method.lower() not in method_types: raise ValueError('index measurement method {} not in allowed list: {}'.format(method,method_types))
+	# if verbose: print('Using index combination method {}'.format(method))
 
 	if len(ranges) == 0: raise ValueError('measureIndex needs at least 1 sample region; zero given')
 	if len(ranges) == 1: method = 'single'
@@ -3823,7 +3979,11 @@ def measureIndex(sp,ranges,sample='median',method='ratio',nsamples=100,noiseFlag
 	if (len(ranges) < 2 and (method in ['ratio','change'])):
 		raise ValueError('Index method {} needs at least 2 sample regions'.format(method))
 	if (len(ranges) < 3 and (method in ['line','inverse_line','avenum','avedenom','sumnum','sumdenom','doubleratio','allers'])):
-		raise ValueError('Index method {} needs at least 3 sample regions'.format(method))
+	 	raise ValueError('Index method {} needs at least 3 sample regions'.format(method))
+	if (len(ranges) < 4 and (method in ['doublesum'])):
+	 	raise ValueError('Index method {} needs at least 3 sample regions'.format(method))
+	if (len(scaling) == 0 and 'scaling' in method):
+	 	raise ValueError('Scaling input {} must be a nonzero vector for method {}'.format(scaling,method))
 
 
 # define the sample vectors
@@ -3902,12 +4062,16 @@ def measureIndex(sp,ranges,sample='median',method='ratio',nsamples=100,noiseFlag
 			val,vals = 0.5*(value[0]+value[1])/value[2],0.5*(value_sim[0,:]+value_sim[1,:])/value_sim[2,:]
 		elif (method == 'inverse_line' or method == 'avedenom'):
 			val,vals = 2.*value[0]/(value[1]+value[2]),2.*value_sim[0,:]/(value_sim[1,:]+value_sim[2,:])
+		elif (method == 'line_scaling'):
+			val,vals = (scaling[0]*value[0]+scaling[1]*value[1])/(scaling[2]*value[2]),(scaling[0]*value_sim[0,:]+scaling[1]*value_sim[1,:])/(scaling[2]*value_sim[2,:])
 		elif (method == 'change'): 
 			val,vals = 2.*(value[0]-value[1])/(value[0]+value[1]),2.*(value_sim[0,:]-value_sim[1,:])/(value_sim[0,:]+value_sim[1,:])
 		elif (method == 'sumnum'):
 			val,vals = (value[0]+value[1])/value[2],(value_sim[0,:]+value_sim[1,:])/value_sim[2,:]
 		elif (method == 'sumdenom'):
 			val,vals = value[0]/(value[1]+value[2]),value_sim[0,:]/(value_sim[1,:]+value_sim[2,:])
+		elif (method == 'doublesum'):
+			val,vals = (value[0]+value[1])/(value[2]+value[3]),(value_sim[0,:]+value_sim[1,:])/(value_sim[2,:]+value_sim[3,:])
 		elif (method == 'doubleratio'):
 			val,vals = (value[0]/value[1])/(value[1]/value[2]),(value_sim[0,:]/value_sim[1,:])/(value_sim[1,:]/value_sim[2,:])
 		elif (method == 'allers'):
@@ -3938,7 +4102,7 @@ def measureIndex(sp,ranges,sample='median',method='ratio',nsamples=100,noiseFlag
 
 
 
-def measureIndexSet(sp,ref='lepine2003',index_info={},range_keyword='ranges',method_keyword='method',sample_keyword='sample',info=False,verbose=ERROR_CHECKING,**kwargs):
+def measureIndexSet(sp,ref='lepine2003',index_info={},range_keyword='ranges',method_keyword='method',sample_keyword='sample',scaling_keyword='scaling',info=False,verbose=ERROR_CHECKING,**kwargs):
 	"""
 	Measures a set of predefined or user-defined spectral indices
 
@@ -4027,7 +4191,10 @@ def measureIndexSet(sp,ref='lepine2003',index_info={},range_keyword='ranges',met
 # measure indices
 	result = {}
 	for n in names:
-		ind,err = measureIndex(sp,index_info[n][range_keyword],method=index_info[n][method_keyword],sample=index_info[n][sample_keyword],verbose=verbose,**kwargs)
+		if 'scaling' in index_info[n][method_keyword]:
+			ind,err = measureIndex(sp,index_info[n][range_keyword],method=index_info[n][method_keyword],sample=index_info[n][sample_keyword],scaling=index_info[n][scaling_keyword],verbose=verbose,**kwargs)
+		else:
+			ind,err = measureIndex(sp,index_info[n][range_keyword],method=index_info[n][method_keyword],sample=index_info[n][sample_keyword],verbose=verbose,**kwargs)
 		result[n] = (ind,err)
 		if verbose == True: print('Index {}: {:.3f}+/-{:.3f}'.format(n,ind,err))
 
@@ -4035,14 +4202,119 @@ def measureIndexSet(sp,ref='lepine2003',index_info={},range_keyword='ranges',met
 
 
 
-def classifyIndices(spec,set='',verbose=ERROR_CHECKING):
+def classifyIndices(sp,ref='lepine2003',indices={},info=False,nsamples=100,round_flag=False,string_flag=True,output='spt',verbose=ERROR_CHECKING,**kwargs):
 	'''
 	Classification program using spectral indices
 	TBD
 	'''
-	pass
+# keyword parameters
+	for k in ['reference','set']: ref = kwargs.get(k,ref)
+	for k in ['index_measurements','index','index_dict']: indices = kwargs.get(k,indices)
+	for k in ['option','options','information','available']: info = kwargs.get(k,info)
+
+# just return information on available sets
+	if info==True:
+		for k in list(INDEX_CLASSIFICATION_RELATIONS.keys()):
+			inds = list(INDEX_CLASSIFICATION_RELATIONS[k]['indices'].keys())
+			bibref = ''
+			if 'bibcode' in list(INDEX_CLASSIFICATION_RELATIONS[k].keys()): bibref = INDEX_CLASSIFICATION_RELATIONS[k]['bibcode']
+			r = inds[0]
+			for i in inds[1:]: r=r+','+i
+			print('{} (bibcode: {}): indices: {}'.format(k,bibref,r))
+		return
+
+# check that ref is in INDEX_CLASSIFICATION_RELATIONS
+	tmp = checkDict(ref,INDEX_CLASSIFICATION_RELATIONS)
+	if tmp==False: raise ValueError('Index classification set {} is not one of the predefined index sets: {}'.format(ref,list(INDEX_CLASSIFICATION_RELATIONS.keys())))
+	method = INDEX_CLASSIFICATION_RELATIONS[tmp]['method']
+	indsets = INDEX_CLASSIFICATION_RELATIONS[tmp]['sets']
+	sptoffset = INDEX_CLASSIFICATION_RELATIONS[tmp]['sptoffset']
+	index_relations = copy.deepcopy(INDEX_CLASSIFICATION_RELATIONS[tmp]['indices'])
+	if verbose: print('Using index-SpT relation from {} (bibcode: {})'.format(tmp,INDEX_CLASSIFICATION_RELATIONS[tmp]['bibcode']))
 
 
+# check coefficient index names are present in indices input; if not remeasure
+	remeasure = False
+	if len(list(indices.keys()))==0: remeasure=True
+	else:
+		for i in list(index_relations.keys()):
+			if i not in list(indices.keys()): remeasure = True
+
+# remeasure indices			
+	if remeasure==True:
+		if verbose==True: print('Remeasuring indices from index sets {}'.format(indsets))
+		for s in indsets:
+			if verbose==True: print('Remeasuring indices for {}'.format(s))
+			tmp = checkDict(s,INDEX_SETS)
+			if tmp==False: raise ValueError('Index set {} is not one of predefined sets: {}; correct parameter dictionary'.format(s,list(INDEX_SETS.keys())))
+			ind = measureIndexSet(sp,ref=s,verbose=False,**kwargs)
+			if sys.version_info.major == 2: indices = dict(indices.items() + ind.items())
+			else: indices = dict(indices.items() | ind.items())			
+
+#	print(indices)
+
+# set up arrays
+	msk = numpy.zeros(len(list(index_relations.keys())))
+	spts = {}
+
+# determine classifications from polynomials
+	if method=='polynomial':
+		for i,index in enumerate(list(index_relations.keys())):
+			samp = numpy.polyval(index_relations[index]['coeff'],numpy.random.normal(indices[index][0]+index_relations[index]['offset'],indices[index][1],nsamples))
+			spts[index] =  [numpy.polyval(index_relations[index]['coeff'],indices[index][0]+index_relations[index]['offset'])+sptoffset,(index_relations[index]['fitunc']**2+numpy.nanstd(samp)**2)]
+			if index_relations[index]['log']==True:
+				samp = numpy.polyval(index_relations[index]['coeff'],numpy.random.normal(numpy.log10(indices[index][0]+index_relations[index]['offset']),indices[index][1]/indices[index][0]/numpy.log(10),nsamples))
+				spts[index] =  [numpy.polyval(index_relations[index]['coeff'],numpy.log10(indices[index][0]+index_relations[index]['offset']))+sptoffset,(index_relations[index]['fitunc']**2+numpy.nanstd(samp)**2)]
+			if spts[index][0] >= numpy.nanmin(index_relations[index]['range']) and \
+				spts[index][0] <= numpy.nanmax(index_relations[index]['range']) and \
+				numpy.isfinite(spts[index][0]): msk[i] = 1.
+#			print(index,indices[index][0],index_relations[index]['offset'],spts[index])
+
+
+# ranges method - NOT CURRENTLY CONSIDERING UNCERTAINTY
+	elif param['method']=='ranges':
+		for i,index in enumerate(list(index_relations.keys())):
+			spts[index] = [numpy.nan,numpy.nan]
+			if indices[index][1] > 0.:
+				for i,r in enumerate(index_relations[index]['values']): 
+					if r[0] < indices[index][0] <= r[1]: spts[index] = [index_relations[index]['spt'][i],0.5]
+			if numpy.isfinite(spts[index][0])==False: msk[i]=0
+
+	else: raise ValueError('Do not understand method {}'.format(param['method']))
+
+# report out individual values
+	if verbose==True: 
+		for i,index in enumerate(list(index_relations.keys())):
+			flg = ''
+			if msk[i] == 0.: flg = '*'
+			print('{}{} = {:.3f}+/-{:.3f} => SpT = {}+/-{:.1f}'.format(flg,index,indices[index][0],indices[index][1],typeToNum(spts[index][0]),spts[index][1]))
+
+
+# determine weighted mean with rejection, iterating to deal with indices outside ranges	
+	vals = numpy.array([spts[i][0] for i in list(index_relations.keys())])
+	wts = numpy.array([1/spts[i][1]**2 for i in list(index_relations.keys())])/msk
+	w = numpy.where(numpy.isfinite(wts+vals))
+	if len(w) == 0:
+		if verbose==True: print('\nNone of the indices in set {} returned viable values\n'.format(ref))
+		return numpy.nan, numpy.nan
+	sptn = numpy.nansum(vals[w]*wts[w])/numpy.nansum(wts[w])
+	sptn_e = (numpy.nanstd(vals[w])**2+1./numpy.nansum(wts[w]))**0.5
+
+# round off to nearest 0.5 subtypes if desired
+	if round_flag==True: sptn = 0.5*numpy.around(sptn*2.)
+
+# change to string if desired
+	if string_flag==True: spt = typeToNum(sptn)
+	else: spt = sptn
+
+	if 'allmeasures' == True and param['method'] == 'polynomial':
+		output = {}
+		for index in list(indsets.keys()):
+			output[index] = {'spt': spts[index][0], 'spt_e': spts[index][1], 'index': indices[index][0], 'index_e': indices[index][1]}
+		output['result'] = (spt,sptn_e)
+		return output
+	else:
+		return spt, sptn_e
 
 
 
@@ -4210,6 +4482,35 @@ def measureEWElement(sp,elem,verbose=ERROR_CHECKING,**kwargs):
 	return output
 
 
+def measureEWSet(sp,ref='mann2013',**kwargs):
+	'''
+	:Purpose: Measures equivalent widths (EWs) of lines from specified sets. Returns dictionary of indices.
+	:param sp: Spectrum class object, which should contain wave, flux and noise array elements
+	:param set: string defining which EW measurement set you want to use; options include:
+
+			- *mann2013*: EW measures from Mann et al. (2013)
+
+	:type set: optional, default = 'mann2013'
+
+	:Example:
+	TBD
+	'''
+	for alts in ['set','ref']: ref = kwargs.get(alts,ref)
+
+# if index information is not passed, then check with INDEX_SET
+	tmp = checkDict(ref,EW_SETS)
+	if tmp==False: raise ValueError('Index set {} is not currently available'.format(ref))
+	info = copy.deepcopy(EW_SETS[tmp])
+
+	result = {'reference': info['reference'],'bibcode': info['bibcode']}
+	for ftr in list(info['features'].keys()):
+		tmp = measureEW(sp,info['features'][ftr]['linecenter'],width=info['features'][ftr]['width'],continuum=info['features'][ftr]['continuum'],continuum_fit_order=info['continuum_fit_order'],recenter=info['features'][ftr]['recenter'],**kwargs)
+		result[ftr] = tmp
+
+
+	return result
+
+
 def zeta(inp,ref='lepine2007',nsamples=100,noiseFlag=False,cah2_name='CaH2',cah3_name='CaH3',tio5_name='TiO5',verbose=ERROR_CHECKING,**kwargs):
 	"""
 	Measures the zeta paramter based on CaH2, CaH3, and TiO5 indices
@@ -4295,7 +4596,115 @@ def zeta(inp,ref='lepine2007',nsamples=100,noiseFlag=False,cah2_name='CaH2',cah3
 	return zeta, e_zeta
 
 
-def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',output='loglhalbol',nsamples=100,noiseFlag=False,verbose=ERROR_CHECKING,**kwargs):
+
+
+def metallicity(inp,ref='mann2013',features={},spt=None,nsamples=100,noiseFlag=False,output='all',verbose=ERROR_CHECKING,**kwargs):
+	"""
+	
+
+	***UPDATE THIS DOCSTRING***
+
+
+	Measures the zeta paramter based on CaH2, CaH3, and TiO5 indices
+
+	Parameters
+	----------
+	inp : Spectrum class object OR dict
+		Can be either a single spectrum class object for which indices are measured, or a dictionary 
+		containing index measurements, with same structure as output of measureIndexSet; i.e.,
+		a series of index name strings, each pointing to 2-element array containing measurement and uncertainty
+		dictionary keys should include the names assigned to cah2_name, cah3_name, and tio5_name should be presend
+
+	ref : string, default = 'lepine2007'
+		named index set contained in the global variable INDEX_SETS
+		alternate names: reference, set
+
+	verbose : bool, default = False
+		if True, give extra feedback in computation process  
+
+	nsamples : int, default = 100
+		Number of Monte Carlo samples for uncertainty determination
+
+	noiseFlag : bool, default = False
+		if True, do not determine uncertainty through Monte Carlo sampling  
+
+	Returns
+	-------
+	
+
+	Examples
+	--------
+
+	TBD
+
+	See Also
+	--------
+
+	measureIndexSet : measures a set of spectral indices
+
+	""" 	
+
+# keyword parameters
+	for k in ['reference','set']: ref = kwargs.get(k,ref)
+
+# check ref is in METALLICITY_RELATIONS
+	tmp = checkDict(ref,METALLICITY_RELATIONS)
+	if tmp==False: raise ValueError('Reference {} is not one of the predefined calibrations: {}'.format(ref,list(METALLICITY_RELATIONS.keys())))
+	feature_sets = METALLICITY_RELATIONS[tmp]['features']
+	relations = METALLICITY_RELATIONS[tmp]['relations']
+	if verbose: print('Determining stellar metallicity using the {} relation (bibcode: {})'.format(tmp,METALLICITY_RELATIONS[tmp]['bibcode']))
+
+# measure indices if this is a spectrum
+	if isinstance(inp,Spectrum):
+		features = {}
+		if verbose==True: print('Remeasuring features from {}'.format(feature_sets))
+		for f in feature_sets:
+			tmp = checkDict(f,EW_SETS)
+			if tmp!=False:
+				ind = measureEWSet(inp,ref=f,verbose=False,**kwargs)
+				if sys.version_info.major == 2: features = dict(features.items() + ind.items())
+				else: features = dict(features.items() | ind.items())	
+			tmp = checkDict(f,INDEX_SETS)
+			if tmp!=False:
+				ind = measureIndexSet(inp,ref=f,verbose=False,**kwargs)
+				if sys.version_info.major == 2: features = dict(features.items() + ind.items())
+				else: features = dict(features.items() | ind.items())	
+	elif isinstance(inp,dict):
+		features = copy.deepcopy(inp)
+	else: raise ValueError('Input parameter should be a Spectrum object of dicitionary of feature measurements; you passed a {}'.format(type(inp)))
+
+# measure spt if not provided
+	if spt==None: spt = classifyTemplate(inp)
+	if isinstance(spt,tuple) or isinstance(spt,list): spt = spt[0]
+	if isinstance(spt,str): spt = typeToNum(spt)
+
+# compute metallicity for each relation
+	vals,e_vals=[],[]
+	for r in list(relations.keys()):
+		if verbose==True: print('\nRelation {}'.format(r))
+		if relations[r]['range'][0] <= spt <= relations[r]['range'][1]:
+			val,e_val = 0.,0.
+			for i,f in enumerate(relations[r]['features']):
+				if isUnit(features[f][0]):
+					val = val+features[f][0].value*relations[r]['coeff'][i]
+					e_val = e_val+(relations[r]['coeff'][i]*features[f][1].value)**2
+				else:
+					val = val+features[f][0]*relations[r]['coeff'][i]
+					e_val = e_val+(relations[r]['coeff'][i]*features[f][1])**2
+				if verbose==True: print('\tFeature {} = {:.2f}+/-{:.2f} x weight {:.4f}'.format(f,features[f][0],features[f][1],relations[r]['coeff'][i]))
+			if verbose==True: print('\tConstant = {:.4f}'.format(relations[r]['coeff'][-1]))
+			val = val+relations[r]['coeff'][-1]
+			e_val = (e_val+relations[r]['unc']**2)**0.5
+			vals.append(val)
+			e_vals.append(e_val)
+			if verbose==True: print('\tMetallicity: {:.2f}+/-{:.2f}'.format(val,e_val))
+		else:
+			if verbose==True: print('\tSpT {} is outside the range for {} relation ({}-{})'.format(typeToNum(spt),r,typeToNum(relations[r]['range'][0]),typeToNum(relations[r]['range'][1])))
+
+	return vals,e_vals
+
+
+def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',spt=None,output='loglhalbol',nsamples=100,noiseFlag=False,verbose=ERROR_CHECKING,**kwargs):
 	"""
 	Determines LHa/Lbol using equivalent width and chi factor
 
@@ -4325,8 +4734,8 @@ def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',output='loglhalbol',nsamples=1
 
 # measure everything if this is a spectrum
 	if isinstance(inp,Spectrum):
-		spt = typeToNum(classifyTemplate(inp))
-		ew,e_ew = measureEW(inp,6563.,recenter=True,absorption=False)
+		if spt==None: spt = typeToNum(classifyTemplate(inp))
+		if e_ew<=0.: ew,e_ew = measureEW(inp,6563.,recenter=True,absorption=False)
 	elif isinstance(inp,str):
 		spt = typeToNum(inp)
 	elif isinstance(inp,int) or isinstance(inp,float):
@@ -4334,6 +4743,7 @@ def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',output='loglhalbol',nsamples=1
 	else: raise ValueError('Input parameter should be a Spectrum object or spectral type; you passed a {}'.format(type(inp)))
 
 # check ew & ew_unc
+	if isinstance(spt,str): spt=typeToNum(spt)
 	if ew == 0. or numpy.isfinite(ew)==False: output = 'chi'
 	if ew < 0.: ew = numpy.absolute(ew)
 
