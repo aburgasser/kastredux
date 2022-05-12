@@ -42,7 +42,7 @@ if sys.version_info.major == 2:	 # switch for those using python 3
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2022.03.22'
+VERSION = '2022.05.11'
 __version__ = VERSION
 GITHUB_URL = 'https://github.com/aburgasser/kastredux/'
 AUTHORS = [
@@ -672,6 +672,19 @@ class Spectrum(object):
 		self.history.append('Smoothed by {} using a scale of {} pixels'.format(method,scale))
 		return
 
+	def trim(self,rng):
+		'''
+		Trim spectrum to range of wavelengths
+		'''
+		if isinstance(rng,list) == False: raise ValueError('Trim range should be 2-element list; you passed {}'.format(rng))
+		if isUnit(rng[0]): rng = [r.to(self.wave.unit).value for r in rng]
+		w = numpy.where(numpy.logical_and(self.wave.value>=numpy.nanmin(rng),self.wave.value<=numpy.nanmax(rng)))
+		if len(w) > 0:
+			for k in ['wave','flux','unc','background']: setattr(self,k,getattr(self,k)[w])
+
+		self.variance = self.unc**2
+		self.history.append('Trimmed to {}--{} {}'.format(rng[0],rng[1],self.wave.unit))
+		return
 
 	def applyWaveCal(self,cal_wave):
 		'''
@@ -3447,7 +3460,7 @@ INDEX_SETS = {
 		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 	}},\
-    'hawley2002': {'altname': ['hawley02','hawley','haw02'], 'bibcode': '2002AJ....123.3409H', 'indices': {\
+	'hawley2002': {'altname': ['hawley02','hawley','haw02'], 'bibcode': '2002AJ....123.3409H', 'indices': {\
 		'VO-7434': {'ranges': ([7430,7470]*u.Angstrom,[7550,7570]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
 		'VO-7912': {'ranges': ([7900,7980]*u.Angstrom,[8400,8420]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
 		'Na-8190': {'ranges': ([8140,8165]*u.Angstrom,[8173,8210]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
@@ -3460,9 +3473,8 @@ INDEX_SETS = {
 		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'VO1': {'ranges': [[7430, 7470]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-#		'TiO6': {'ranges': [[7550,7570]*u.Angstrom,[7745,7765]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO6': {'ranges': [[7745,7765]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'VO2': {'ranges': [[7920, 7960]*u.Angstrom,[8440, 8470]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO6': {'ranges': [[7550,7570]*u.Angstrom,[7745,7765]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'VO2': {'ranges': [[7920,7960]*u.Angstrom,[8130,8150]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'TiO7': {'ranges': [[8440, 8470]*u.Angstrom,[8400, 8420]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 		'Color-M': {'ranges': [[8105, 8155]*u.Angstrom,[6510, 6560]*u.Angstrom],'method': 'ratio','sample': 'average'},\
 	}},\
@@ -3543,15 +3555,17 @@ METALLICITY_RELATIONS = {
 }
 
 EW_LINES = {
-	'H I': {'altname': ['H','H1','HI'], 'lines': [4861*u.Angstrom,6563*u.Angstrom]},\
-	'Li I': {'altname': ['Li','Li1','LiI'], 'lines': [6708*u.Angstrom]},\
-	'K I': {'altname': ['K','K1','KI'], 'lines': [7665*u.Angstrom,7699*u.Angstrom]},\
-	'Na I': {'altname': ['Na','Na1','NaI'], 'lines': [8183*u.Angstrom,8195*u.Angstrom]},\
-	'Cs I': {'altname': ['Cs','Cs1','CsI'], 'lines': [8521*u.Angstrom,8943*u.Angstrom]},\
-	'Rb I': {'altname': ['Rb','Rb1','RbI'], 'lines': [7800*u.Angstrom,7948*u.Angstrom]},\
-	'Ca I': {'altname': ['Ca','Ca1','CaI'], 'lines': [7209*u.Angstrom,7213*u.Angstrom,7326*u.Angstrom]},\
-	'Ca II': {'altname': ['Ca2','CaII'], 'lines': [8436*u.Angstrom]},\
-	'Ti I': {'altname': ['Ti','Ti1','Ti I'], 'lines': [6573*u.Angstrom,8542*u.Angstrom]},\
+	'HI': {'altname': ['H','H1','H I'], 'lines': [4861*u.Angstrom,6563*u.Angstrom]},\
+	'LiI': {'altname': ['Li','Li1','Li I'], 'lines': [6708*u.Angstrom]},\
+	'KI': {'altname': ['K','K1','K I'], 'lines': [7665*u.Angstrom,7699*u.Angstrom]},\
+	'NaI': {'altname': ['Na','Na1','Na I'], 'lines': [8183*u.Angstrom,8195*u.Angstrom]},\
+	'CsI': {'altname': ['Cs','Cs1','Cs I'], 'lines': [8521*u.Angstrom,8943*u.Angstrom]},\
+	'RbI': {'altname': ['Rb','Rb1','Rb I'], 'lines': [7800*u.Angstrom,7948*u.Angstrom]},\
+	'MgI': {'altname': ['Mg','Mg1','Mg I'], 'lines': [8806*u.Angstrom]},\
+	'CaI': {'altname': ['Ca','Ca1','Ca I'], 'lines': [6572*u.Angstrom,7209*u.Angstrom,7213*u.Angstrom,7326*u.Angstrom]},\
+	'CaII': {'altname': ['Ca2','Ca II'], 'lines': [8498*u.Angstrom,8542*u.Angstrom,8662*u.Angstrom,]},\
+	'FeI': {'altname': ['Fe','Fe1','Fe I'], 'lines': [8327*u.Angstrom,8388*u.Angstrom,8662*u.Angstrom,8824*u.Angstrom,9000*u.Angstrom]},\
+	'TiI': {'altname': ['Ti','Ti1','Ti I'], 'lines': [6085*u.Angstrom,6126*u.Angstrom,6259*u.Angstrom,6743*u.Angstrom,7209*u.Angstrom,7248*u.Angstrom,8382*u.Angstrom,8412*u.Angstrom,8435*u.Angstrom]},\
 }
 
 CHI_RELATIONS = {
@@ -3590,7 +3604,7 @@ INDEX_CLASSIFICATION_RELATIONS = {
 		'TiO6': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [-11.2,11.9],'fitunc': 0.5,'offset':0,'log': False}, \
 		'VO2': {'range': [typeToNum('M3'),typeToNum('M9')], 'coeff': [-10.5,12.4],'fitunc': 0.5,'offset':0,'log': False}, \
 		'TiO7': {'range': [typeToNum('M3'),typeToNum('M9')], 'coeff': [-11.0,13.7],'fitunc': 0.5,'offset':0,'log': False}, \
-		'Color-M': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [7.5,1.6],'fitunc': 0.5,'offset':0,'log': True}, \
+		'Color-M': {'range': [typeToNum('M4'),typeToNum('M8')], 'coeff': [7.5,1.6],'fitunc': 0.5,'offset':0,'log': True}, \
 	}},
 	'lepine2003-sd': {'altname': ['lepine-sd','lepine03-sd','lep03-sd'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
 		'CaH2': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
@@ -4412,6 +4426,7 @@ def measureEW(sp,lc,width=0.,recenter=True,absorption=True,continuum=0.,continuu
 			plt.xlabel('Wavelength ({})'.format(sp.wave.unit))
 			plt.ylabel('Flux Density ({})'.format(sp.flux.unit))
 			if plot_file != '': plt.savefig(plot_file)
+			else: plt.show()
 
 
 # MC for errors			
@@ -4781,6 +4796,117 @@ def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',spt=None,output='loglhalbol',n
 	if output=='lhalbol': return lhalbol, e_lhalbol
 	else: return numpy.log10(lhalbol), (e_lhalbol/lhalbol)/numpy.log(10)
 
+
+
+def theWorks(sp,measure_classification=True,classification_plot='',classification_range=[6200,7500],measure_index_set=True,index_sets=list(INDEX_SETS.keys()),measure_index_classification=True,index_class_sets=list(INDEX_CLASSIFICATION_RELATIONS.keys()),measure_zeta=True,zeta_sets=list(ZETA_RELATIONS.keys()),measure_metallicity=False,metallicity_sets=list(METALLICITY_RELATIONS.keys()),measure_halpha=True,halpha_sets=list(CHI_RELATIONS.keys()),measure_lines=True,line_sets=list(EW_LINES.keys()),verbose=True):
+	"""
+	Conducts a full analysis of a spectrum
+
+	Parameters
+	----------
+
+	TBD
+
+	Returns
+	-------
+
+	TBD
+
+	Examples
+	--------
+
+	TBD
+
+	See Also
+	--------
+
+	TBD
+
+	""" 	
+
+	output = {}
+# classification by template 
+	if measure_classification==True:
+		initializeStandards([50,75])
+		initializeStandards([50,75],sd=True)
+		initializeStandards([50,75],esd=True)
+		initializeStandards([50,75],usd=True)
+		if classification_plot=='': spt = classifyTemplate(sp,plot=True,fit_range=classification_range)
+		else: spt = classifyTemplate(sp,output=classification_plot,fit_range=classification_range)
+		if verbose==True: print('\tTemplate classification = {}'.format(spt))
+		output['spt-template'] = spt
+	
+# indices 
+	if measure_index_set==True:
+		inds = {}
+		if verbose==True: print('\nIndices:')
+		for iset in index_sets:
+			inds[iset] = measureIndexSet(sp,iset)
+			if verbose==True: print('\t{}'.format(iset))
+			for k in list(inds[iset].keys()): print('\t\t{}: {:.3f}+/-{:.3f}'.format(k,inds[iset][k][0],inds[iset][k][1]))
+		output['indices'] = inds
+
+# index-based classifications
+	if measure_index_classification==True:
+		ind_classifications = {}
+		if verbose==True: print('\nIndex based classifications:')
+		for iset in index_class_sets:
+			ind_classifications[iset] = classifyIndices(sp,iset)
+			if verbose==True:
+				print('\t{}: {}+/-{:.1f}'.format(iset,ind_classifications[iset][0],ind_classifications[iset][1]))
+		output['spt-indices'] = ind_classifications
+
+# zeta
+	if measure_zeta==True:
+		zetas = {}
+		if verbose==True: print('\nZeta:')
+		for zset in zeta_sets:
+			z,z_e = zeta(sp,ref=zset)
+			zclass = 'd'
+			if z<0.825: zclass = 'sd'
+			if z<0.5: zclass = 'esd'
+			if z<0.2: zclass = 'usd'
+			if verbose==True:
+				print('\t{}: {:.3f}+/-{:.3f} => {}'.format(zset,z,z_e,zclass))
+				print('\tEquivalent metallicity = {:.3f}'.format(1.26*z-1.25))
+			zetas[zset] = {'zeta': (z,z_e), 'zclass': zclass}
+		output['zeta'] = zetas
+
+# metallicity
+# NOTE: THIS IS NOT GENERALLY WORKING, SO LEAVING AS DEFAULT FALSE UNTIL FIXED
+	if measure_metallicity==True:
+		zs = {}
+		if verbose==True: print('\nZeta:')
+		for mset in metallicity_sets:
+			zs[mset] = metallicity(sp,ref=mset)
+			if verbose==True:
+				print('\t{}: {:.2f}+/-{:.2f}'.format(mset,zs[mset][0],zs[mset][1]))
+		output['metallicity'] = zs
+
+# ew
+	if measure_lines==True:
+		ews = {}
+		if verbose==True: print('\nLine EWs:')
+		for elem in line_sets:
+			if elem=='h1': ews[elem] = measureEWElement(sp,elem,absorption=False)
+			else: ews[elem] = measureEWElement(sp,elem)
+			if verbose==True:
+				print('\t{}'.format(elem))
+				for k in ews[elem].keys(): print('\t\t{}: {:.2f}+/-{:.2f} Ang'.format(k,ews[elem][k][0],ews[elem][k][1]))
+		output['lines'] = ews
+
+# halpha emission
+	if measure_halpha==True:
+		lhalbol = {}
+		if verbose==True: print('\nH alpha:')
+		for cset in halpha_sets:
+			lhalbol[cset] = chiFactor(sp,ref=cset,spt=spt,output='loglhalbol',verbose=True)
+			if verbose==True:
+				print('\t{}: log LHa/Lbol = {:.2f}+/-{:.2f}'.format(cset,lhalbol[cset][0],lhalbol[cset][1]))
+		output['halpha'] = lhalbol
+
+		
+	return output
 
 
 
