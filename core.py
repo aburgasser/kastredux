@@ -15,6 +15,7 @@ import re
 import shutil
 import sys
 import warnings
+import warnings
 
 # imports - external
 import matplotlib
@@ -35,6 +36,7 @@ if sys.version_info.major != 2 and sys.version_info.major != 3:
 	raise NameError('\nKASTREDUX only works on Python 2.7 and 3.X\n')
 if sys.version_info.major == 2:	 # switch for those using python 3
 	import string
+warnings.simplefilter('ignore', numpy.RankWarning)
 
 
 ############################################################
@@ -42,7 +44,7 @@ if sys.version_info.major == 2:	 # switch for those using python 3
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2022.05.11'
+VERSION = '2022.05.18'
 __version__ = VERSION
 GITHUB_URL = 'https://github.com/aburgasser/kastredux/'
 AUTHORS = [
@@ -3539,8 +3541,8 @@ EW_SETS = {
 }
 
 ZETA_RELATIONS = {
-	'lepine2007': {'altname': ['lepine','lepine07','lep07'], 'reference': 'Lepine et al. (2007)','bibcode':'2007ApJ...669.1235L', 'coeff': [-0.164,0.67,-0.118,-0.05],'range': [], 'classes': [0.825,0.5,0.2]},
-	'lepine2013': {'altname': ['lepine13','lep13'], 'reference': 'Lepine et al. (2013)','bibcode':'', 'coeff': [-0.588,2.211,-1.906,0.622],'range': [], 'classes': [0.825,0.5,0.2]},
+	'lepine2007': {'altname': ['lepine','lepine07','lep07'],'bibcode':'2007ApJ...669.1235L', 'coeff': [-0.164,0.67,-0.118,-0.05],'range': [], 'classes': [0.825,0.5,0.2]},
+	'lepine2013': {'altname': ['lepine13','lep13'],'bibcode':'', 'coeff': [-0.588,2.211,-1.906,0.622],'range': [], 'classes': [0.825,0.5,0.2]},
 	'dhital2012': {'altname': ['dhital','dhital12','dhi12'], 'reference': 'Dhital et al. (2012)','bibcode':'2012AJ....143...67D', 'coeff': [-0.005,-0.183,0.694,-0.127,-0.047],'range': [], 'classes': [0.825,0.5,0.2]},
 	'zhang2019': {'altname': ['zhang','zhang19','zha19'], 'reference': 'Zhang et al. (2019)','bibcode':'', 'coeff': [-0.1069,0.3863,0.312,-0.2849],'range': [], 'classes': [0.75,0.5,0.2]},
 }
@@ -3554,6 +3556,14 @@ METALLICITY_RELATIONS = {
 	}},
 }
 
+ZETA_METALLICITY_RELATIONS = {
+	'lepine2013': {'altname': ['lepine','lepine13','lep13','lepine-n12','lepine13-n12','lep13-n12'], 'bibcode':'', 'type':'[Fe/H]','coeff': [0.750,-0.743],'unc': 0.383,'range': [0.9,1.2]},
+	'lepine2013-ra12': {'altname': ['lepine-ra12','lepine13-ra12','lep13-ra12'], 'bibcode':'', 'type':'[Fe/H]','coeff': [1.071,-1.096],'unc': 0.654,'range': [0.9,1.2]},
+	'woolf2009': {'altname': ['woolf','woolf09','woo09'], 'bibcode':'2009PASP..121..117W', 'type':'[Fe/H]','coeff': [1.632,-1.685],'unc':0.3,'range': [0.05,1.1]},
+	'mann2013': {'altname': ['mann','mann13','man13'], 'bibcode': '2013AJ....145...52M', 'type':'[Fe/H]','coeff': [1.26,-1.25],'unc': 0.20,'range': [-0.2,1.2]},
+	'mann2013-mh': {'altname': ['mann-mh','mann13-mh','man13-mh'], 'bibcode': '2013AJ....145...52M', 'type':'[M/H]','coeff': [0.88,-0.89],'unc': 0.20,'range': [-0.2,1.2]},
+}
+
 EW_LINES = {
 	'HI': {'altname': ['H','H1','H I'], 'lines': [4861*u.Angstrom,6563*u.Angstrom]},\
 	'LiI': {'altname': ['Li','Li1','Li I'], 'lines': [6708*u.Angstrom]},\
@@ -3564,7 +3574,7 @@ EW_LINES = {
 	'MgI': {'altname': ['Mg','Mg1','Mg I'], 'lines': [8806*u.Angstrom]},\
 	'CaI': {'altname': ['Ca','Ca1','Ca I'], 'lines': [6572*u.Angstrom,7209*u.Angstrom,7213*u.Angstrom,7326*u.Angstrom]},\
 	'CaII': {'altname': ['Ca2','Ca II'], 'lines': [8498*u.Angstrom,8542*u.Angstrom,8662*u.Angstrom,]},\
-	'FeI': {'altname': ['Fe','Fe1','Fe I'], 'lines': [8327*u.Angstrom,8388*u.Angstrom,8662*u.Angstrom,8824*u.Angstrom,9000*u.Angstrom]},\
+	'FeI': {'altname': ['Fe','Fe1','Fe I'], 'lines': [7583*u.Angstrom,8327*u.Angstrom,8388*u.Angstrom,8514*u.Angstrom,8824*u.Angstrom,9000*u.Angstrom]},\
 	'TiI': {'altname': ['Ti','Ti1','Ti I'], 'lines': [6085*u.Angstrom,6126*u.Angstrom,6259*u.Angstrom,6743*u.Angstrom,7209*u.Angstrom,7248*u.Angstrom,8382*u.Angstrom,8412*u.Angstrom,8435*u.Angstrom]},\
 }
 
@@ -3596,7 +3606,7 @@ INDEX_CLASSIFICATION_RELATIONS = {
 	'martin1999-l': {'altname': ['martin-l','martin99-l','mar99-l'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['martin1999'], 'indices': {\
 		'PC3': {'range': [typeToNum('L1'),typeToNum('L6')], 'coeff': [-0.047,1.181,8.557],'fitunc': 0.54,'offset':0,'log': False}, \
 	}},
-	'lepine2003': {'altname': ['lepine2003-dwarf','lepine','lepine03','lep03','lepine-d','lepine03-d','lep03-d'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
+	'lepine2003': {'altname': ['lepine2003-dwarf','lepine','lepine03','lep03','lepine-d','lepine03-d','lep03-d'], 'bibcode': '2003AJ....125.1598L', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
 		'CaH2': {'range': [typeToNum('M0'),typeToNum('M6')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
 		'CaH3': {'range': [typeToNum('M0'),typeToNum('M6')], 'coeff': [-18.00,15.80],'fitunc': 0.5,'offset':0,'log': False}, \
 		'TiO5': {'range': [typeToNum('M0'),typeToNum('M6')], 'coeff': [-9.64,7.76],'fitunc': 0.5,'offset':0,'log': False}, \
@@ -3606,15 +3616,23 @@ INDEX_CLASSIFICATION_RELATIONS = {
 		'TiO7': {'range': [typeToNum('M3'),typeToNum('M9')], 'coeff': [-11.0,13.7],'fitunc': 0.5,'offset':0,'log': False}, \
 		'Color-M': {'range': [typeToNum('M4'),typeToNum('M8')], 'coeff': [7.5,1.6],'fitunc': 0.5,'offset':0,'log': True}, \
 	}},
-	'lepine2003-sd': {'altname': ['lepine-sd','lepine03-sd','lep03-sd'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
+	'lepine2003-sd': {'altname': ['lepine-sd','lepine03-sd','lep03-sd'], 'bibcode': '2003AJ....125.1598L', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
 		'CaH2': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
 		'CaH3': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [-16.02,13.78],'fitunc': 0.5,'offset':0,'log': False}, \
 		'Color-M': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [7.3,-0.6],'fitunc': 0.5,'offset':0,'log': True}, \
 	}},
-	'lepine2003-esd': {'altname': ['lepine-esd','lepine03-esd','lep03-esd'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
+	'lepine2003-esd': {'altname': ['lepine-esd','lepine03-esd','lep03-esd'], 'bibcode': '2003AJ....125.1598L', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
 		'CaH2': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
 		'CaH3': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [-13.47,11.50],'fitunc': 0.5,'offset':0,'log': False}, \
 		'Color-M': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [22,-4.1],'fitunc': 0.5,'offset':0,'log': True}, \
+	}},
+	'lepine2013': {'altname': ['lepine2013-dwarf','lepine13','lep13','lepine13-d','lep13-d'], 'bibcode': '2013AJ....145..102L', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
+		'CaH2': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [7.99,21.71,11.50],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-21.68,18.80],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO5': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-9.55,7.83],'fitunc': 0.5,'offset':0,'log': False}, \
+#		'VO1': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [-71.4,69.8],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO6': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-16.65,21.23,-15.68,9.92],'fitunc': 0.5,'offset':0,'log': False}, \
+#		'VO2': {'range': [typeToNum('M3'),typeToNum('M9')], 'coeff': [-19.59,22.33,-12.47,9.56],'fitunc': 0.5,'offset':0,'log': False}, \
 	}},
 	'riddick2007': {'altname': ['riddick','riddick07','rid07'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['kirkpatrick1995','kirkpatrick1999','reid1995','stauffer1999','riddick2006','slesnick2006','lepine2003'], 'indices': {\
 		'VO7445': {'range': [typeToNum('M5'),typeToNum('M8')], 'coeff': [13.078,17.121,5.0881],'fitunc': 0.5,'offset':-0.982,'log': False}, \
@@ -3907,7 +3925,7 @@ def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6500,8800],plot=False,v
 	return spt
 
 
-def measureIndex(sp,ranges,sample='median',method='ratio',scaling=[],nsamples=100,noiseFlag=False,plot=False,verbose=ERROR_CHECKING,**pkwargs):
+def measureIndex(sp,ranges,sample='median',method='ratio',scaling=[],nsamples=100,clean=False,cleansig=4.,noiseFlag=False,plot=False,verbose=ERROR_CHECKING,**pkwargs):
 	"""
 	Measures a spectral index on a spectrum based on defined methodology
 
@@ -4037,6 +4055,19 @@ def measureIndex(sp,ranges,sample='median',method='ratio',scaling=[],nsamples=10
 		if noiseFlag == False:
 			s = interp1d(sp.wave.value[w],sp.unc.value[w],bounds_error=False,fill_value=0.)
 			yNum_e = s(xNum)
+
+# clean out bad pixels
+# NOTE: CURRENTLY TURNED OFF BY DEFAULT DUE TO ERROR ON POLYFIT LINE
+		if clean==True and len(xNum)>3:
+			p = numpy.polyfit(xNum,yNum,1)
+			diff = numpy.absolute(yNum-numpy.polyval(p,xNum))
+			if noiseFlag == False: sigdiff = diff/yNum_e
+			else: sigdiff = diff/numpy.nanstd(diff)
+			w = numpy.where(sigdiff>cleansig)
+			if len(w[0]) > 2:
+				xNum=xNum[w]
+				yNum=yNum[w]
+				if noiseFlag == False: yNum_e = y_Num_e[w]
 
 # first compute the actual value
 		if (sample == 'integrate'): 
@@ -4797,8 +4828,69 @@ def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',spt=None,output='loglhalbol',n
 	else: return numpy.log10(lhalbol), (e_lhalbol/lhalbol)/numpy.log(10)
 
 
+def zeta_metallicity(inp,zeta=0.,e_zeta=0.,ref='mann2013',nsamples=100,noiseFlag=False,verbose=ERROR_CHECKING,**kwargs):
+	"""
+	Determines metallicity based on zeta value
 
-def theWorks(sp,measure_classification=True,classification_plot='',classification_range=[6200,7500],measure_index_set=True,index_sets=list(INDEX_SETS.keys()),measure_index_classification=True,index_class_sets=list(INDEX_CLASSIFICATION_RELATIONS.keys()),measure_zeta=True,zeta_sets=list(ZETA_RELATIONS.keys()),measure_metallicity=False,metallicity_sets=list(METALLICITY_RELATIONS.keys()),measure_halpha=True,halpha_sets=list(CHI_RELATIONS.keys()),measure_lines=True,line_sets=list(EW_LINES.keys()),verbose=True):
+	Parameters
+	----------
+
+	Returns
+	-------
+	tuple of floats
+		metallicity ([Fe/H] or [M/H]) and its uncertainty
+
+	Examples
+	--------
+
+	TBD
+
+	See Also
+	--------
+
+	zeta : measures zeta based on indices
+	metallicity : measures metallicity based on indices
+
+	""" 	
+
+# keyword parameters
+	for k in ['reference','set']: ref = kwargs.get(k,ref)
+
+
+# measure everything if this is a spectrum
+	if isinstance(inp,Spectrum):
+		if e_zeta<=0. or zeta==0.: zeta,e_zeta = zeta(inp,ref=ref,verbose=verbose,nsamples=nsamples,noiseFlag=noiseFlag)
+	elif isinstance(inp,float):
+		zeta = copy.deepcopy(inp)
+	else: raise ValueError('Input parameter should be a Spectrum object or zeta value; you passed a {}'.format(type(inp)))
+
+# compute chi
+# check ref is in CHI_RELATIONS
+	tmp = checkDict(ref,ZETA_METALLICITY_RELATIONS)
+	if tmp==False: raise ValueError('Reference {} is not one of the predefined calibrations: {}'.format(ref,list(ZETA_METALLICITY_RELATIONS.keys())))
+	if verbose: print('Determining zeta-based metallicity using the {} relation (bibcode: {})'.format(tmp,ZETA_METALLICITY_RELATIONS[tmp]['bibcode']))
+
+	z_type = ZETA_METALLICITY_RELATIONS[tmp]['type']
+	z_coeff = ZETA_METALLICITY_RELATIONS[tmp]['coeff']
+	z_unc = ZETA_METALLICITY_RELATIONS[tmp]['unc']
+	z_range = ZETA_METALLICITY_RELATIONS[tmp]['range']
+
+	if zeta < numpy.nanmin(z_range) or zeta > numpy.nanmax(z_range): 
+		print('zeta = {} is outside range for {} relation: {} to {}'.format(zeta,tmp,numpy.nanmin(z_range),numpy.nanmax(z_range)))
+		return numpy.nan, numpy.nan
+
+	z = numpy.polyval(z_coeff,zeta)
+	e_z = z_unc
+	if e_zeta<= 0.: noiseFlag=True
+	if noiseFlag==False:
+		zs = numpy.polyval(z_coeff,numpy.random.normal(zeta,e_zeta,nsamples))
+		e_z = (z_unc**2+numpy.nanstd(zs)**2)**0.5
+
+	if verbose: print('() = {:.2f}+/-{:.2f}'.format(z_type,z,e_z))
+	return z,e_z
+
+
+def theWorks(sp,measure_classification=True,classification_plot='',classification_range=[6200,7500],measure_index_set=True,index_sets=list(INDEX_SETS.keys()),measure_index_classification=True,index_class_sets=list(INDEX_CLASSIFICATION_RELATIONS.keys()),measure_zeta=True,zeta_sets=list(ZETA_RELATIONS.keys()),zeta_ref_default='lepine2013',measure_zeta_metallicity=True,zeta_metallicity_sets=list(ZETA_METALLICITY_RELATIONS.keys()),measure_halpha=True,halpha_sets=list(CHI_RELATIONS.keys()),measure_lines=True,line_sets=list(EW_LINES.keys()),verbose=True):
 	"""
 	Conducts a full analysis of a spectrum
 
@@ -4868,20 +4960,31 @@ def theWorks(sp,measure_classification=True,classification_plot='',classificatio
 			if z<0.2: zclass = 'usd'
 			if verbose==True:
 				print('\t{}: {:.3f}+/-{:.3f} => {}'.format(zset,z,z_e,zclass))
-				print('\tEquivalent metallicity = {:.3f}'.format(1.26*z-1.25))
+#				print('\tEquivalent metallicity = {:.3f}'.format(1.26*z-1.25))
 			zetas[zset] = {'zeta': (z,z_e), 'zclass': zclass}
 		output['zeta'] = zetas
 
+# zeta metallicity
+	if measure_zeta_metallicity==True:
+		zms = {}
+		if verbose==True: print('\nZeta metallicity for {}:'.format(zeta_ref_default))
+		z,z_e = zeta(sp,ref=zeta_ref_default)
+		for zset in zeta_metallicity_sets:
+			zms[zset] = zeta_metallicity(z,e_zeta=z_e,ref=zset)
+			if verbose==True:
+				print('\t{}: {:.2f}+/-{:.2f}'.format(zset,zms[zset][0],zms[zset][1]))
+		output['zeta_metallicity'] = zms
+
 # metallicity
 # NOTE: THIS IS NOT GENERALLY WORKING, SO LEAVING AS DEFAULT FALSE UNTIL FIXED
-	if measure_metallicity==True:
-		zs = {}
-		if verbose==True: print('\nZeta:')
-		for mset in metallicity_sets:
-			zs[mset] = metallicity(sp,ref=mset)
-			if verbose==True:
-				print('\t{}: {:.2f}+/-{:.2f}'.format(mset,zs[mset][0],zs[mset][1]))
-		output['metallicity'] = zs
+	# if measure_metallicity==True:
+	# 	zs = {}
+	# 	if verbose==True: print('\nZeta:')
+	# 	for mset in metallicity_sets:
+	# 		zs[mset] = metallicity(sp,ref=mset)
+	# 		if verbose==True:
+	# 			print('\t{}: {:.2f}+/-{:.2f}'.format(mset,zs[mset][0],zs[mset][1]))
+	# 	output['metallicity'] = zs
 
 # ew
 	if measure_lines==True:
@@ -4892,7 +4995,7 @@ def theWorks(sp,measure_classification=True,classification_plot='',classificatio
 			else: ews[elem] = measureEWElement(sp,elem)
 			if verbose==True:
 				print('\t{}'.format(elem))
-				for k in ews[elem].keys(): print('\t\t{}: {:.2f}+/-{:.2f} Ang'.format(k,ews[elem][k][0],ews[elem][k][1]))
+				for k in ews[elem].keys(): print('\t\t{}: {:.2f}+/-{:.2f}'.format(k,ews[elem][k][0],ews[elem][k][1]))
 		output['lines'] = ews
 
 # halpha emission
@@ -4900,7 +5003,10 @@ def theWorks(sp,measure_classification=True,classification_plot='',classificatio
 		lhalbol = {}
 		if verbose==True: print('\nH alpha:')
 		for cset in halpha_sets:
-			lhalbol[cset] = chiFactor(sp,ref=cset,spt=spt,output='loglhalbol',verbose=True)
+			chi,e_chi = chiFactor(sp,ref=cset,spt=spt,output='chi')
+			if verbose==True:
+				print('\t{}: chi = {:.3e}+/-{:.3e}'.format(cset,chi,e_chi))
+			lhalbol[cset] = chiFactor(sp,ref=cset,spt=spt,output='loglhalbol')
 			if verbose==True:
 				print('\t{}: log LHa/Lbol = {:.2f}+/-{:.2f}'.format(cset,lhalbol[cset][0],lhalbol[cset][1]))
 		output['halpha'] = lhalbol
