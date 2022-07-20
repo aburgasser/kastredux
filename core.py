@@ -44,8 +44,9 @@ warnings.simplefilter('ignore', numpy.RankWarning)
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2022.05.18'
+VERSION = '2022.07.19'
 __version__ = VERSION
+CODE_PATH = os.path.dirname(os.path.abspath(__file__))
 GITHUB_URL = 'https://github.com/aburgasser/kastredux/'
 AUTHORS = [
 	'Adam Burgasser (PI)',
@@ -54,29 +55,6 @@ EMAIL = 'aburgasser@ucsd.edu'
 CITATION = ''
 BIBCODE = ''
 
-#set the CODE_PATH, either from set environment variable or from PYTHONPATH or from sys.path
-CODE_PATH = ''
-if os.environ.get('{}_PATH'.format(NAME.upper())) != None:
-	CODE_PATH = os.environ['{}_PATH'.format(NAME.upper())]
-if os.environ.get('{}PATH'.format(NAME.upper())) != None and CODE_PATH == '':
-	CODE_PATH = os.environ['{}PATH'.format(NAME.upper())]
-# get from PYTHONPATH
-if os.environ.get('PYTHONPATH') != None and CODE_PATH == '':
-	path = os.environ['PYTHONPATH']
-	for i in path.split(':'):
-		if NAME in i or NAME.upper() in i:
-			CODE_PATH = i
-# get from system path
-if CODE_PATH == '':
-	checkpath = [NAME in r for r in sys.path]
-	if max(checkpath):
-		CODE_PATH = sys.path[checkpath.index(max(checkpath))]
-	checkpath = [NAME.upper() in r for r in sys.path]
-	if max(checkpath):
-		CODE_PATH = sys.path[checkpath.index(max(checkpath))]
-if CODE_PATH == '':
-	print('Warning: could not set CODE_PATH variable from PYTHONPATH or system PATH environmental variables; some functionality may not work')
-	CODE_PATH = './'
 
 ############################################################
 # WELCOME!
@@ -96,6 +74,7 @@ print('Please report any errors are feature requests to our github page, {}\n\n'
 
 FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
 FLUXCALS = {
+	'BD28+4211': {'FILE' : 'fbd28d4211.dat'},
 	'FEIGE34': {'FILE' : 'ffeige34.dat'},
 	'FEIGE66': {'FILE' : 'ffeige66.dat'},
 	'FEIGE67': {'FILE' : 'ffeige67.dat'},
@@ -117,11 +96,13 @@ PLOT_DEFAULTS = {'figsize': [6,4], 'fontsize': 16,
 
 TELLSTDFOLDER = CODE_PATH+'/resources/telluric_standards/'
 
+SAMPLEFOLDER = CODE_PATH+'/resources/sample_spectra/'
+
 ERROR_CHECKING = False
 
 
 ############################################################
-# KAST INSTRUMENT CONSTANTS AND FUNCTIONS
+# KAST INSTRUMENT CONSTANTS
 ############################################################
 
 DEFAULT_WAVE_UNIT = u.Angstrom
@@ -238,6 +219,272 @@ CCD_PARAMETERS = {
 }
 
 
+############################################################
+# OTHER PROGAM CONSTANTS
+############################################################
+
+MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+FEATURES = { \
+	'HI': {'altname': ['hi','h1'], 'label': r'H I', 'type': 'line', 'wavelengths': [[4861]*u.Angstrom,[6563]*u.Angstrom]},\
+	'LiI': {'altname': ['lii','li1'], 'label': r'Li I', 'type': 'line', 'wavelengths': [[6708]*u.Angstrom]}, \
+	'NaI': {'altname': ['nai','na1'], 'label': r'Na I', 'type': 'line', 'wavelengths': [[8183,8195]*u.Angstrom]}, \
+	'CsI': {'altname': ['csi','cs1'], 'label': r'Cs I', 'type': 'line', 'wavelengths': [[8521]*u.Angstrom,[8943]*u.Angstrom]}, \
+	'RbI': {'altname': ['rbi','rb1'], 'label': r'Rb I', 'type': 'line', 'wavelengths': [[7800]*u.Angstrom,[7948]*u.Angstrom]}, \
+	'CaI': {'altname': ['cai','ca1'], 'label': r'Ca I', 'type': 'line', 'wavelengths': [[6572]*u.Angstrom,[7209,7213]*u.Angstrom,[7326]*u.Angstrom]}, \
+	'MgI': {'altname': ['mgi','mg1'], 'label': r'Mg I', 'type': 'line', 'wavelengths': [[8806]*u.Angstrom]}, \
+	'CaII': {'altname': ['ca2'], 'label': r'Ca II', 'type': 'line', 'wavelengths': [[8498,8542,8662]*u.Angstrom]}, \
+	'TiI': {'altname': ['tii','ti1'], 'label': r'Ti I', 'type': 'line', 'wavelengths': [[6085,6126,6259]*u.Angstrom,[6743]*u.Angstrom,[7209,7248]*u.Angstrom,[8382,8412,8435]*u.Angstrom]}, \
+	'FeI': {'altname': ['fei','fe1'], 'label': r'Fe I', 'type': 'line', 'wavelengths': [[7583]*u.Angstrom,[8327,8388]*u.Angstrom,[8514]*u.Angstrom,[8824]*u.Angstrom,[9000]*u.Angstrom]}, \
+	'KI': {'altname': ['ki','k1'], 'label': r'K I', 'type': 'line', 'wavelengths': [[7665,7699]*u.Angstrom]}, \
+	'H2O': {'altname': [], 'label': r'H$_2$O', 'type': 'band', 'wavelengths': [[9250,9500]*u.Angstrom]}, \
+	'TiO': {'altname': [], 'label': r'TiO', 'type': 'band', 'wavelengths': [[6150,6280]*u.Angstrom,[6569,6852]*u.Angstrom,[7053,7270]*u.Angstrom,[7590,8000]*u.Angstrom,[8206,8400]*u.Angstrom,[8432,8600]*u.Angstrom]}, \
+	'VO': {'altname': [], 'label': r'VO', 'type': 'band', 'wavelengths': [[7334,7534]*u.Angstrom,[7851,7973]*u.Angstrom,[9540,9630]*u.Angstrom]}, \
+	'CaH': {'altname': [], 'label': r'CaH', 'type': 'band', 'wavelengths': [[6346,6390]*u.Angstrom,[6750,7050]*u.Angstrom]}, \
+	'CrH': {'altname': [], 'label': r'CrH', 'type': 'band', 'wavelengths': [[8611,8681]*u.Angstrom]}, \
+	'FeH': {'altname': [], 'label': r'FeH', 'type': 'band', 'wavelengths': [[8692,8750]*u.Angstrom,[9896,10300]*u.Angstrom]}, \
+}
+
+INDEX_SETS = {
+	'kirkpatrick1991': {'altname': ['kirkpatrick91','kir91'], 'bibcode': '1991ApJS...77..417K', 'indices': {\
+		'K91-A': {'ranges': ([7020,7050]*u.Angstrom,[6960,6990]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'K91-B': {'ranges': ([7375,7385]*u.Angstrom,[7353,7363]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'K91-C': {'ranges': ([8100,8130]*u.Angstrom,[8174,8204]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'K91-D': {'ranges': ([8567,8577]*u.Angstrom,[8537,8547]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+	}},\
+	'kirkpatrick1995': {'altname': ['kirkpatrick95','kir95'], 'bibcode': '1995AJ....109..797K', 'indices': {\
+		'VO7445': {'ranges': ([7350,7400]*u.Angstrom,[7510,7560]*u.Angstrom,[7420,7470]*u.Angstrom),'scaling':(0.5625,0.4375,1.0), 'method': 'line_scaling', 'sample': 'integrate'},\
+	}},\
+	'kirkpatrick1999': {'altname': ['kirkpatrick','kirkpatrick99','kir99'], 'bibcode': '1999ApJ...519..802K', 'indices': {\
+		'Rb-a': {'ranges': ([.77752,.77852]*u.micron,[.78152,.78252]*u.micron,[.77952,.78052]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+		'Rb-b': {'ranges': ([.79226,.79326]*u.micron,[.79626,.79726]*u.micron,[.79426,.79526]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+		'Na-a': {'ranges': ([.81533,.81633]*u.micron,[.81783,.81883]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Na-b': {'ranges': ([.81533,.81633]*u.micron,[.81898,.81998]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Cs-a': {'ranges': ([.84961,.85061]*u.micron,[.85361,.85461]*u.micron,[.85161,.85261]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+		'Cs-b': {'ranges': ([.89185,.89285]*u.micron,[.89583,.89683]*u.micron,[.89385,.89485]*u.micron), 'method': 'line', 'sample': 'integrate'},\
+		'TiO-a': {'ranges': ([.7033,.7048]*u.micron,[.7058,.7073]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'TiO-b': {'ranges': ([.8400,.8415]*u.micron,[.8435,.8470]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'VO-a': {'ranges': ([.7350,.7370]*u.micron,[.7550,.7570]*u.micron,[.7430,.7470]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
+		'VO-b': {'ranges': ([.7860,.7880]*u.micron,[.8080,.8100]*u.micron,[.7960,.8000]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
+		'CrH-a': {'ranges': ([.8580,.8600]*u.micron,[.8621,.8641]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'CrH-b': {'ranges': ([.9940,.9960]*u.micron,[.9970,.9990]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'FeH-a': {'ranges': ([.8660,.8680]*u.micron,[.8700,.8720]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'FeH-b': {'ranges': ([.9863,.9883]*u.micron,[.9908,.9928]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Color-a': {'ranges': ([.9800,.9850]*u.micron,[.7300,.7350]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Color-b': {'ranges': ([.9800,.9850]*u.micron,[.7000,.7050]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Color-c': {'ranges': ([.9800,.9850]*u.micron,[.8100,.8150]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'Color-d': {'ranges': ([.9675,.9850]*u.micron,[.7350,.7550]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+	}},\
+	'martin1999': {'altname': ['martin','martin99','mar99'], 'bibcode': '1999AJ....118.2466M', 'indices': {\
+		'PC3': {'ranges': ([.823,.827]*u.micron,[.754,.758]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'PC6': {'ranges': ([.909,.913]*u.micron,[.650,.654]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'CrH1': {'ranges': ([.856,.860]*u.micron,[.861,.865]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'CrH2': {'ranges': ([.984,.988]*u.micron,[.997,1.001]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'FeH1': {'ranges': ([.856,.860]*u.micron,[.8685,.8725]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'FeH2': {'ranges': ([.984,.988]*u.micron,[.990,.994]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'H2O1': {'ranges': ([.919,.923]*u.micron,[.928,.932]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'TiO1': {'ranges': ([.700,.704]*u.micron,[.706,.710]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'TiO2': {'ranges': ([.838,.842]*u.micron,[.844,.848]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'VO1': {'ranges': ([.754,.758]*u.micron,[.742,.746]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+		'VO2': {'ranges': ([.799,.803]*u.micron,[.790,.794]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
+	}},\
+	'gizis1997': {'altname': ['gizis','gizis97','giz97'], 'bibcode': '', 'indices': {\
+		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avedenom','sample': 'average'},\
+		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'hawley2002': {'altname': ['hawley02','hawley','haw02'], 'bibcode': '2002AJ....123.3409H', 'indices': {\
+		'VO-7434': {'ranges': ([7430,7470]*u.Angstrom,[7550,7570]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'VO-7912': {'ranges': ([7900,7980]*u.Angstrom,[8400,8420]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'Na-8190': {'ranges': ([8140,8165]*u.Angstrom,[8173,8210]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'TiO-8440': {'ranges': ([8440,8470]*u.Angstrom,[8400,8420]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+		'Color-1': {'ranges': ([8900,9100]*u.Angstrom,[7350,7550]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
+	}},\
+	'lepine2003': {'altname': ['lepine','lepine03','lep03'], 'bibcode': '', 'indices': {\
+		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avedenom','sample': 'average'},\
+		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'VO1': {'ranges': [[7430, 7470]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+#		'TiO6': {'ranges': [[7550,7570]*u.Angstrom,[7745,7765]*u.Angstrom],'method': 'ratio','sample': 'average'},\ CORRECTED BELOW
+		'TiO6': {'ranges': [[7745,7765]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'VO2': {'ranges': [[7920,7960]*u.Angstrom,[8130,8150]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO7': {'ranges': [[8440, 8470]*u.Angstrom,[8400, 8420]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'Color-M': {'ranges': [[8105, 8155]*u.Angstrom,[6510, 6560]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'reid1995': {'altname': ['reid','reid95','rei95'], 'bibcode': '', 'indices': {\
+		'TiO1': {'ranges': [[6718, 6723]*u.Angstrom,[6703, 6708]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO2': {'ranges': [[7058, 7061]*u.Angstrom,[7043, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO3': {'ranges': [[7092, 7097]*u.Angstrom,[7079, 7084]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO4': {'ranges': [[7130, 7135]*u.Angstrom,[7115, 7120]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'TiO5': {'ranges': [[7126, 7135]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avdenom','sample': 'average'},\
+		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+		'CaOH': {'ranges': [[6230, 6240]*u.Angstrom,[6345, 6354]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'burgasser2003': {'altname': ['burgasser','burgasser03','bur03'], 'bibcode': '', 'indices': {\
+		'CsI-A': {'ranges': [[8496.1, 8506.1]*u.Angstrom, [8536.1, 8546.1]*u.Angstrom,[8516.1, 8626.1]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+		'CsI-B': {'ranges': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+		'H2O': {'ranges': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'Color-e': {'ranges': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'burgasser2003': {'altname': ['burgasser','burgasser03','bur03'], 'bibcode': '', 'indices': {\
+		'CsI-A': {'ranges': [[8496.1, 8506.1]*u.Angstrom, [8536.1, 8546.1]*u.Angstrom,[8516.1, 8626.1]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+		'CsI-B': {'ranges': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
+		'H2O': {'ranges': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'CrH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'FeH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
+		'Color-e': {'ranges': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
+	}},\
+	'riddick2006': {'altname': ['riddick','riddick06','rid06'], 'bibcode': '', 'indices': {\
+		'R1': {'ranges': [[8025,8130]*u.Angstrom, [8015,8025]*u.Angstrom],'method': 'ratio','sample': 'median'},\
+		'R2': {'ranges': [[8145,8460]*u.Angstrom, [8460,8470]*u.Angstrom],'method': 'ratio','sample': 'median'},\
+		'R3': {'ranges': [[8025,8130]*u.Angstrom, [8145,8460]*u.Angstrom,[8015,8025]*u.Angstrom, [8460,8470]*u.Angstrom],'method': 'doublesum','sample': 'median'},\
+		'R4': {'ranges': [[8854,8857]*u.Angstrom, [8454,8458]*u.Angstrom,[8873,8878]*u.Angstrom],'method': 'inverse_line','sample': 'median'},\
+	}},\
+	'stauffer1999': {'altname': ['stauffer','stauffer99','sta99'], 'bibcode': '', 'indices': {\
+		'c81': {'ranges': [[8115,8165]*u.Angstrom, [7865,7915]*u.Angstrom,[8490,8540]*u.Angstrom],'method': 'inverse_line','sample': 'median'},\
+	}},\
+	'slesnick2006': {'altname': ['slesnick','slesnick06','sle06'], 'bibcode': '', 'indices': {\
+		'TiO-7140': {'ranges': [[7010,7060]*u.Angstrom, [7115,7165]*u.Angstrom],'method': 'ratio','sample': 'median'},\
+		'TiO-8465': {'ranges': [[8405,8425]*u.Angstrom, [8455,8475]*u.Angstrom],'method': 'ratio','sample': 'median'},\
+		'Na-8189': {'ranges': [[8174,8204]*u.Angstrom, [8135,8165]*u.Angstrom],'method': 'ratio','sample': 'median'},\
+	}},\
+}
+
+EW_SETS = {
+	'mann2013': {'altname': ['mann','mann13','man13'], 'reference': 'Mann et al. (2013)', 'bibcode': '2013AJ....145...52M', 'continuum_fit_order': 1, 'features': {\
+		'f01': {'linecenter': 0.4648*u.micron,'width': 0.00115*u.micron, 'recenter': False,'continuum': [0.461,0.4625,0.468,0.47]*u.micron},\
+		'f02': {'linecenter': 0.5608*u.micron,'width': 0.0010*u.micron,'recenter': False,'continuum': [0.5269,0.5299,0.566,0.5675]*u.micron},\
+		'f03': {'linecenter': 0.6118*u.micron,'width': 0.0010*u.micron, 'recenter': False,'continuum': [0.566,0.5675,0.6586,0.6607]*u.micron},\
+		'f04': {'linecenter': 0.6232*u.micron,'width': 0.0010*u.micron, 'recenter': False,'continuum': [0.566,0.5675,0.6586,0.6607]*u.micron},\
+		'f05': {'linecenter': 0.6416*u.micron,'width': 0.00205*u.micron, 'recenter': False,'continuum': [0.566,0.5675,0.6586,0.6607]*u.micron},\
+		'f06': {'linecenter': 0.7540*u.micron,'width': 0.0010*u.micron, 'recenter': False,'continuum': [0.7390,0.75,0.81,0.816]*u.micron},\
+		'f07': {'linecenter': 0.8208*u.micron,'width': 0.00175*u.micron, 'recenter': False,'continuum': [0.81,0.816,0.823,0.83]*u.micron},\
+		'f08': {'linecenter': 0.8684*u.micron,'width': 0.0013*u.micron, 'recenter': False,'continuum': [0.859,0.892,0.91,0.912]*u.micron},\
+	}},
+}
+
+ZETA_RELATIONS = {
+	'lepine2007': {'altname': ['lepine','lepine07','lep07'],'bibcode':'2007ApJ...669.1235L', 'coeff': [-0.164,0.67,-0.118,-0.05],'range': [], 'classes': [0.825,0.5,0.2]},
+	'lepine2013': {'altname': ['lepine13','lep13'],'bibcode':'2013AJ....145..102L', 'coeff': [-0.588,2.211,-1.906,0.622],'range': [], 'classes': [0.825,0.5,0.2]},
+	'dhital2012': {'altname': ['dhital','dhital12','dhi12'], 'reference': 'Dhital et al. (2012)','bibcode':'2012AJ....143...67D', 'coeff': [-0.005,-0.183,0.694,-0.127,-0.047],'range': [], 'classes': [0.825,0.5,0.2]},
+	'zhang2019': {'altname': ['zhang','zhang19','zha19'], 'reference': 'Zhang et al. (2019)','bibcode':'2019ApJS..240...31Z', 'coeff': [-0.1069,0.3863,0.312,-0.2849],'range': [], 'classes': [0.75,0.5,0.2]},
+}
+
+METALLICITY_RELATIONS = {
+	'mann2013': {'altname': ['mann','mann13','man13'], 'reference': 'Mann et al. (2013)', 'bibcode': '2013AJ....145...52M', 'features':['mann2013','hawley2002'],'relations': {
+		'feh-early': {'features': ['f07','f01','f02','Color-1'],'coeff': [0.53,0.26,-0.16,-0.784,-0.34], 'unc': 0.13, 'range': ['K5.5','M2']},
+		'mh-early': {'features': ['f07','f01','f08','Color-1'],'coeff': [0.38,0.21,0.29,-0.504,-0.79], 'unc': 0.11, 'range': ['K5.5','M2']},
+		'feh-late': {'features': ['f05','f08','f07','f03','Color-1'],'coeff': [-0.20,0.48,0.24,0.14,-0.204,-0.32], 'unc': 0.14, 'range': ['M2','M6']},
+		'mh-late': {'features': ['f05','f04','f06','Color-1'],'coeff': [-0.065,-0.071,-0.30,0.719,-0.24], 'unc': 0.11, 'range': ['M2','M6']},
+	}},
+}
+
+ZETA_METALLICITY_RELATIONS = {
+	'lepine2013': {'altname': ['lepine','lepine13','lep13','lepine-n12','lepine13-n12','lep13-n12'], 'bibcode':'', 'type':'[Fe/H]','coeff': [0.750,-0.743],'unc': 0.383,'range': [0.9,1.2]},
+	'lepine2013-ra12': {'altname': ['lepine-ra12','lepine13-ra12','lep13-ra12'], 'bibcode':'', 'type':'[Fe/H]','coeff': [1.071,-1.096],'unc': 0.654,'range': [0.9,1.2]},
+	'woolf2009': {'altname': ['woolf','woolf09','woo09'], 'bibcode':'2009PASP..121..117W', 'type':'[Fe/H]','coeff': [1.632,-1.685],'unc':0.3,'range': [0.05,1.1]},
+	'mann2013': {'altname': ['mann','mann13','man13'], 'bibcode': '2013AJ....145...52M', 'type':'[Fe/H]','coeff': [1.26,-1.25],'unc': 0.20,'range': [-0.2,1.2]},
+	'mann2013-mh': {'altname': ['mann-mh','mann13-mh','man13-mh'], 'bibcode': '2013AJ....145...52M', 'type':'[M/H]','coeff': [0.88,-0.89],'unc': 0.20,'range': [-0.2,1.2]},
+}
+
+EW_LINES = {
+	'HI': {'altname': ['H','H1','H I'], 'lines': [4861*u.Angstrom,6563*u.Angstrom]},\
+	'LiI': {'altname': ['Li','Li1','Li I'], 'lines': [6708*u.Angstrom]},\
+	'KI': {'altname': ['K','K1','K I'], 'lines': [7665*u.Angstrom,7699*u.Angstrom]},\
+	'NaI': {'altname': ['Na','Na1','Na I'], 'lines': [8183*u.Angstrom,8195*u.Angstrom]},\
+	'CsI': {'altname': ['Cs','Cs1','Cs I'], 'lines': [8521*u.Angstrom,8943*u.Angstrom]},\
+	'RbI': {'altname': ['Rb','Rb1','Rb I'], 'lines': [7800*u.Angstrom,7948*u.Angstrom]},\
+	'MgI': {'altname': ['Mg','Mg1','Mg I'], 'lines': [8806*u.Angstrom]},\
+	'CaI': {'altname': ['Ca','Ca1','Ca I'], 'lines': [6572*u.Angstrom,7209*u.Angstrom,7213*u.Angstrom,7326*u.Angstrom]},\
+	'CaII': {'altname': ['Ca2','Ca II'], 'lines': [8498*u.Angstrom,8542*u.Angstrom,8662*u.Angstrom,]},\
+	'FeI': {'altname': ['Fe','Fe1','Fe I'], 'lines': [7583*u.Angstrom,8327*u.Angstrom,8388*u.Angstrom,8514*u.Angstrom,8824*u.Angstrom,9000*u.Angstrom]},\
+	'TiI': {'altname': ['Ti','Ti1','Ti I'], 'lines': [6085*u.Angstrom,6126*u.Angstrom,6259*u.Angstrom,6743*u.Angstrom,7209*u.Angstrom,7248*u.Angstrom,8382*u.Angstrom,8412*u.Angstrom,8435*u.Angstrom]},\
+}
+
+CHI_RELATIONS = {
+	'schmidt2014': {'altname': ['schmidt','schmidt14'], 'reference': 'Schmidt et al. (2014)','bibcode':'2014PASP..126..642S', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-6,
+		'spt': [17,18,19,20,21,22,23,24,25,26,27], \
+		'values': [10.28,4.26,2.52,1.98,2.25,2.11,1.67,1.16,1.46,1.23,0.73],\
+		'scatter': [3.13,1.18,0.58,0.27,0.11,0.36,0.22,0.3,0.28,0.3,0.3],\
+		},
+	'douglas2014': {'altname': ['douglas','douglas14'], 'reference': 'Douglas et al. (2014)','bibcode':'2014ApJ...795..161D', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-5,
+		'spt': [10,11,12,13,14,15,16,17,18,19], \
+		'values': [6.6453,6.0334,5.2658,4.4872,3.5926,2.4768,1.7363,1.2057,0.6122,0.3522],\
+		'scatter': [0.6207,0.5326,0.5963,0.4967,0.5297,0.4860,0.3475,0.3267,0.2053,0.1432],\
+		},
+}
+
+INDEX_CLASSIFICATION_RELATIONS = {
+	'reid1995': {'altname': ['reid','reid95','rei95'], 'bibcode': '1995AJ....110.1838R', 'method': 'polynomial', 'sptoffset': 'M0', 'sets': ['lepine2003'], 'indices': {\
+		'TiO5': {'range': ['K7','M6'], 'coeff': [-10.775,8.2],'fitunc': 0.5,'offset':0,'log': False}, \
+	}},
+	'gizis1997': {'altname': ['gizis','gizis97','giz97'], 'bibcode': '1997AJ....113..806G', 'method': 'polynomial', 'sptoffset': 'M0', 'sets': ['lepine2003'], 'indices': {\
+		'TiO5': {'range': ['K7','M6'], 'coeff': [-9.64,7.76],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH2': {'range': ['K7','M6'], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': ['K7','M6'], 'coeff': [-18.00,15.80],'fitunc': 0.5,'offset':0,'log': False}, \
+	}},
+	'martin1999': {'altname': ['martin','martin99','mar99','martin1999-m','martin-m','martin99-m','mar99-m'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': 'M0', 'sets': ['martin1999'], 'indices': {\
+		'PC3': {'range': ['M2.5','L1'], 'coeff': [-2.024,11.715,-6.685],'fitunc': 0.28,'offset':0,'log': False}, \
+	}},
+	'martin1999-l': {'altname': ['martin-l','martin99-l','mar99-l'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': 'M0', 'sets': ['martin1999'], 'indices': {\
+		'PC3': {'range': ['L1','L6'], 'coeff': [-0.047,1.181,8.557],'fitunc': 0.54,'offset':0,'log': False}, \
+	}},
+	'lepine2003': {'altname': ['lepine2003-dwarf','lepine','lepine03','lep03','lepine-d','lepine03-d','lep03-d'], 'bibcode': '2003AJ....125.1598L', 'method': 'polynomial', 'sptoffset': 'M0', 'sets': ['lepine2003'], 'indices': {\
+		'CaH2': {'range': ['M0','M6'], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': ['M0','M6'], 'coeff': [-18.00,15.80],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO5': {'range': ['M0','M6'], 'coeff': [-9.64,7.76],'fitunc': 0.5,'offset':0,'log': False}, \
+		'VO1': {'range': ['M2','M8'], 'coeff': [-30.5,32.2],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO6': {'range': ['M2','M8'], 'coeff': [-11.2,11.9],'fitunc': 0.5,'offset':0,'log': False}, \
+		'VO2': {'range': ['M3','M9'], 'coeff': [-10.5,12.4],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO7': {'range': ['M3','M9'], 'coeff': [-11.0,13.7],'fitunc': 0.5,'offset':0,'log': False}, \
+		'Color-M': {'range': ['M2','M8'], 'coeff': [7.5,1.6],'fitunc': 0.5,'offset':0,'log': True}, \
+	}},
+	'lepine2003-sd': {'altname': ['lepine-sd','lepine03-sd','lep03-sd'], 'bibcode': '2003AJ....125.1598L', 'method': 'polynomial', 'sptoffset': 'M0', 'sets': ['lepine2003'], 'indices': {\
+		'CaH2': {'range': ['K5','M7'], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': ['K5','M7'], 'coeff': [-16.02,13.78],'fitunc': 0.5,'offset':0,'log': False}, \
+		'Color-M': {'range': ['M2','M8'], 'coeff': [7.3,-0.6],'fitunc': 0.5,'offset':0,'log': True}, \
+	}},
+	'lepine2003-esd': {'altname': ['lepine-esd','lepine03-esd','lep03-esd'], 'bibcode': '2003AJ....125.1598L', 'method': 'polynomial', 'sptoffset': 'M0', 'sets': ['lepine2003'], 'indices': {\
+		'CaH2': {'range': ['K5','M7'], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': ['K5','M7'], 'coeff': [-13.47,11.50],'fitunc': 0.5,'offset':0,'log': False}, \
+		'Color-M': {'range': ['M2','M8'], 'coeff': [22,-4.1],'fitunc': 0.5,'offset':0,'log': True}, \
+	}},
+	'lepine2013': {'altname': ['lepine2013-dwarf','lepine13','lep13','lepine13-d','lep13-d'], 'bibcode': '2013AJ....145..102L', 'method': 'polynomial', 'sptoffset': 'M0', 'sets': ['lepine2003'], 'indices': {\
+		'CaH2': {'range': ['K7','M6'], 'coeff': [7.99,21.71,11.50],'fitunc': 0.5,'offset':0,'log': False}, \
+		'CaH3': {'range': ['K7','M6'], 'coeff': [-21.68,18.80],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO5': {'range': ['K7','M6'], 'coeff': [-9.55,7.83],'fitunc': 0.5,'offset':0,'log': False}, \
+#		'VO1': {'range': ['M2','M8'], 'coeff': [-71.4,69.8],'fitunc': 0.5,'offset':0,'log': False}, \
+		'TiO6': {'range': ['K7','M6'], 'coeff': [-16.65,21.23,-15.68,9.92],'fitunc': 0.5,'offset':0,'log': False}, \
+#		'VO2': {'range': ['M3','M9'], 'coeff': [-19.59,22.33,-12.47,9.56],'fitunc': 0.5,'offset':0,'log': False}, \
+	}},
+	'riddick2007': {'altname': ['riddick','riddick07','rid07'], 'bibcode': '2007MNRAS.381.1067R', 'method': 'polynomial', 'sptoffset': 'M0', 'sets': ['kirkpatrick1995','kirkpatrick1999','reid1995','stauffer1999','riddick2006','slesnick2006','lepine2003'], 'indices': {\
+		'VO7445': {'range': ['M5','M8'], 'coeff': [13.078,17.121,5.0881],'fitunc': 0.5,'offset':-0.982,'log': False}, \
+		'VO-a': {'range': ['M5','M8'], 'coeff': [6.7099,11.226,5.0705],'fitunc': 0.5,'offset':-0.982,'log': False}, \
+		'VO-b': {'range': ['M3','M8'], 'coeff': [-325.44,394.28,-156.53,29.469,3.4875],'fitunc': 0.5,'offset':-1.017,'log': False}, \
+		'VO2': {'range': ['M3','M8'], 'coeff': [-14.66,-8.3231,-7.9389,2.6102],'fitunc': 0.5,'offset':-0.963,'log': False}, \
+		'R1': {'range': ['M2.5','M8'], 'coeff': [60.755,-53.025,21.085,2.8078],'fitunc': 0.5,'offset':-1.044,'log': False}, \
+		'R2': {'range': ['M3','M8'], 'coeff': [8.5121,-14.105,10.503,2.9091],'fitunc': 0.5,'offset':-1.035,'log': False}, \
+		'R3': {'range': ['M2.5','M8'], 'coeff': [52.531,-47.679,19.708,2.8379],'fitunc': 0.5,'offset':-1.035,'log': False}, \
+		'TiO-8465': {'range': ['M3','M8'], 'coeff': [5.6765,-10.142,8.7311,3.2147],'fitunc': 0.5,'offset':-1.085,'log': False}, \
+		'c81': {'range': ['M2.5','M8'], 'coeff': [3.0567,-6.817,8.0558,2.4331],'fitunc': 0.5,'offset':-1.036,'log': False}, \
+	}},
+}
+
+
+############################################################
+# KAST IMAGE FUNCTIONS
+############################################################
+
 # extract image mode from image header
 def kastRBMode(hdr,keyword='VERSION'):
 	if keyword not in list(hdr.keys()):
@@ -338,11 +585,11 @@ class Spectrum(object):
 			if not isinstance(getattr(self,k),numpy.ndarray): setattr(self,k,numpy.array(getattr(self,k)))
 		if len(self.flux) == 0: raise ValueError('Spectrum object must be initiated with a flux array')
 		if len(self.wave) == 0: self.wave = numpy.arange(len(self.flux))
-		if len(self.unc) == 0: self.unc = numpy.array([numpy.nan]*len(self.flux))
+		if len(self.unc) == 0: self.unc = numpy.array([numpy.nan]*len(self.flux))*self.flux.unit
 #		if len(self.unc) == 0: self.unc = numpy.zeros(len(self.flux))
 		if len(self.variance) == 0: self.variance = self.unc**2
-		if len(self.background) == 0: self.background = numpy.zeros(len(self.flux))
-		if len(self.mask) == 0: self.mask = numpy.zeros(len(self.flux))
+		if len(self.background) == 0: self.background = numpy.zeros(len(self.flux))*self.flux.unit
+		if len(self.mask) == 0: self.mask = numpy.array([False]*len(self.flux))
 # set units
 #		for k in list(default_units.keys()):
 #			if isUnit(getattr(self,k))==False: setattr(self,k,getattr(self,k)*default_units[k])
@@ -398,7 +645,13 @@ class Spectrum(object):
 			except: pass
 # set variance
 		self.variance = self.unc**2
-# need to: 
+# clean out nans: 
+		# for kk in ['flux','unc']:
+		# 	w = numpy.where(numpy.isfinite(getattr(self,kk).value)==False)
+		# 	if len(w[0])>0:
+		# 		w = numpy.where(numpy.isfinite(getattr(self,kk).value)==True)
+		# 		for k in ['wave','flux','unc','background']: setattr(self,k,getattr(self,k)[w])
+
 		self.history.append('Spectrum cleaned')
 
 		return
@@ -616,7 +869,7 @@ class Spectrum(object):
 		'''
 		for k in ['flux','background','unc']:
 			if k in list(self.__dict__.keys()): setattr(self,k,getattr(self,k)*fact)
-		self.variance = self.unc**2
+		self.clean()
 		self.history.append('Spectrum scaled by factor {}'.format(fact))
 		return
 
@@ -659,7 +912,7 @@ class Spectrum(object):
 		elif method=='median':
 			xsamp = numpy.arange(0,len(self.wave)-scale+1,scale)
 #			self.wave = numpy.array([self.wave.value[x+int(0.5*scale)] for x in xsamp])*self.wave.unit
-			for k in ['flux','unc','background']:
+			for k in ['wave','flux','unc','background']:
 				repl = []
 				for x in xsamp: 
 					if len(repl)<len(self.flux.value):
@@ -670,9 +923,32 @@ class Spectrum(object):
 			print('Warning: cannot smooth using method {}, no change to spectrum'.format(method))
 			return
 
-		self.variance = self.unc**2
+		self.clean()
 		self.history.append('Smoothed by {} using a scale of {} pixels'.format(method,scale))
 		return
+
+	def cleanCR(self,smooth=3,scale=5,replace=True,replace_value='local',local_range=50):
+		'''
+		Cleans out bad pixels by subtracting a smoothed version and identifying outliers
+		This is superior to template fitting methods
+		'''
+		# smoothing function
+		
+		s0 = copy.deepcopy(self)
+		sm = copy.deepcopy(self)
+		sm.smooth(smooth)
+		self.maskComp(sm,rescale=False,apply=False,scale=scale)
+# unmask HI emission line regions
+		for wv in FEATURES['HI']['wavelengths']:
+			w = numpy.where(numpy.absolute(self.wave.value-wv.value)<20.)
+			if len(w[0])>0: self.mask[w]=False
+		nclean = len(numpy.where(self.mask==True)[0])
+		if nclean>0:
+			self.applyMask(replace=replace,replace_value=replace_value,local_range=local_range)
+			self.clean()
+			self.history.append('CR cleaned {} pixels by comparing to smoothed by {} pixel with scale factor {}'.format(nclean,smooth,scale))
+		return
+
 
 	def trim(self,rng):
 		'''
@@ -681,12 +957,151 @@ class Spectrum(object):
 		if isinstance(rng,list) == False: raise ValueError('Trim range should be 2-element list; you passed {}'.format(rng))
 		if isUnit(rng[0]): rng = [r.to(self.wave.unit).value for r in rng]
 		w = numpy.where(numpy.logical_and(self.wave.value>=numpy.nanmin(rng),self.wave.value<=numpy.nanmax(rng)))
-		if len(w) > 0:
-			for k in ['wave','flux','unc','background']: setattr(self,k,getattr(self,k)[w])
+		if len(w[0]) > 0:
+			for k in ['wave','flux','unc','background','mask']: setattr(self,k,getattr(self,k)[w])
 
-		self.variance = self.unc**2
+		self.clean()
 		self.history.append('Trimmed to {}--{} {}'.format(rng[0],rng[1],self.wave.unit))
 		return
+
+	def sample(self,rng,method='median',verbose=ERROR_CHECKING):
+		'''
+		:Purpose: 
+			Obtains a sample of spectrum over specified wavelength range
+
+		:Required Inputs: 
+
+			:param range: the range(s) over which the spectrum is sampled
+			a single 2-element array or array of 2-element arrays
+
+		:Optional Inputs: 
+
+			None
+
+		:Example:
+			TBD
+		'''
+
+# single number = turn into small range
+		if isinstance(rng,float) or isinstance(rng,int):
+			rng = [rng-0.01*(numpy.nanmax(self.wave.value)-numpy.nanmin(self.wave.value)),rng+0.01*(numpy.nanmax(self.wave.value)-numpy.nanmin(self.wave.value))]
+
+		if not isinstance(rng,list): rng = list(rng)
+
+		if isUnit(rng[0]):
+			try: rng = [r.to(self.wave.unit).value for r in rng]
+			except: raise ValueError('Could not convert trim range unit {} to spectrum wavelength unit {}'.format(rng.unit,self.wave.unit))
+
+		w = numpy.where(numpy.logical_and(self.wave.value >= rng[0],self.wave.value <= rng[1]))
+		if len(w[0])>0:
+			if method in ['median','med']: val = numpy.nanmedian(self.flux.value[w])
+			elif method in ['mean','average','ave']: val = numpy.nanmean(self.flux.value[w])
+			elif method in ['max','maximum']: val = numpy.nanmax(self.flux.value[w])
+			elif method in ['min','minimum']: val = numpy.nanmin(self.flux.value[w])
+			elif method in ['std','stddev','stdev','rms']: val = numpy.nanstd(self.flux.value[w])
+			else: raise ValueError('Did not recongize sampling method {}'.format(method))
+			return val
+		else:
+			if verbose==True: print('Sampling range {} outside wavelength range of data'.format(rng))
+			return numpy.nan
+
+	def applyMask(self,mask=[],replace=True,replace_value='local',local_range=50):
+		'''
+		Apply a mask to spectral elements
+		'''
+		if len(mask)==0: mask = copy.deepcopy(self.mask)
+		wok = numpy.where(mask==False)
+		wrej = numpy.where(mask==True)
+		if len(wok[0])>0:
+			if replace==False:
+				for k in ['wave','flux','unc','background','mask']: 
+					setattr(self,k,getattr(self,k)[wok])
+				self.history.append('Removed {} pixels flagged in mask'.format(len(wrej[0])))
+			else:
+				for k in ['flux','unc','background']: 
+					vals = getattr(self,k)
+					if isUnit(vals): vals=vals.value
+					if replace_value=='zero': 
+						vals[wrej] = 0.
+						if k=='flux': self.history.append('Replaced {} pixels flagged in mask with 0'.format(len(wrej[0])))
+					elif replace_value=='median': 
+						vals[wrej] = numpy.nanmedian(vals[wok])
+						if k=='flux': self.history.append('Replaced {} pixels flagged in mask with median value {}'.format(len(wrej[0]),numpy.nanmedian(vals[wok])))
+					elif replace_value=='local': 
+						for ind in wrej[0]:
+							vals[ind] = numpy.nan
+							wsample = numpy.where(numpy.logical_and(self.wave.value>=(self.wave.value[ind]-local_range),self.wave.value<=(self.wave.value[ind]+local_range)))
+							if len(wsample[0])>0: vals[ind] = numpy.nanmedian(vals[wsample])
+						if k=='flux': self.history.append('Replaced {} pixels flagged in mask with local median'.format(len(wrej[0])))
+					elif replace_value=='nan': 
+						vals[wrej] = numpy.nan
+						if k=='flux': self.history.append('Replaced {} pixels flagged in mask with nan'.format(len(wrej[0])))
+					else: raise ValueError('Did not recognize replacement value command {}'.format(replace_value))
+					if isUnit(getattr(self,k)): vals=vals*getattr(self,k).unit
+					setattr(self,k,vals)
+				setattr(self,'mask',numpy.array([False]*len(vals)))
+			self.clean()
+		return
+
+	def padMask(self):
+		w = numpy.where(self.mask==True)
+		if len(w[0])>0:
+			for i in w[0]:
+				if i>0: self.mask[i-1]=True
+				if i<len(self.mask)-1: self.mask[i+1]=True
+		self.history.append('Padded mask by 1 pixel')
+		return	
+
+
+	def maskComp(self,comp,scale=2,apply=True,ignore_lines=True,ignore_width=5,rescale=False,replace=False,pad=True):
+		'''
+		Generate a mask array from a comparison spectrum
+		'''
+		diff = self-comp
+		if numpy.nanmin(diff.wave.value)>numpy.nanmin(self.wave.value) or numpy.nanmax(diff.wave.value)<numpy.nanmax(self.wave.value):
+			self.trim([numpy.nanmin(diff.wave.value),numpy.nanmax(diff.wave.value)])
+			diff = self-comp
+		if rescale==True:
+			c,s = compareSpectra(self,comp)
+			comp.scale(s)
+			diff = self-comp
+		var = numpy.absolute((diff.flux.value-numpy.nanmedian(diff.flux.value))/diff.unc.value)
+		self.mask = var>scale
+		if ignore_lines==True:
+#			for elem in list(EW_LINES.keys()):
+			for elem in ['HI','NaI','KI']:
+				for l in EW_LINES[elem]['lines']:
+					self.mask[numpy.where(numpy.logical_and(self.wave.value>(l.value-ignore_width),self.wave.value<(l.value+ignore_width)))]=False
+		self.history.append('Masked {} pixels that deviated from comparison'.format(len(numpy.where(self.mask==True)[0])))
+		if pad==True: self.padMask()  
+		if apply==True: self.applyMask(replace=replace)
+		return
+
+
+	def maskFlux(self,value,min=True,apply=True,pad=False):
+		'''
+		Generate a mask array based on min/max value
+		'''
+		if min==True: self.mask = self.flux.value<value
+		else: self.mask = self.flux.value>value
+		self.history.append('Masked {} pixels that were above/below {}'.format(len(numpy.where(self.mask==True)),value))
+		if pad==True: self.padMask()   
+		if apply==True: self.applyMask()
+		return
+
+	def maskWave(self,rng,apply=True,pad=False):
+		'''
+		Generate a mask array based on min/max value
+		'''
+		if isinstance(rng,list) == False: raise ValueError('Trim range should be 2-element list; you passed {}'.format(rng))
+		if isUnit(rng[0]): rng = [r.to(self.wave.unit).value for r in rng]
+		w = numpy.where(numpy.logical_and(self.wave.value>=numpy.nanmin(rng),self.wave.value<=numpy.nanmax(rng)))
+		if len(w[0])>0: self.mask[w] = True 
+		self.history.append('Masked {} pixels in wavelength range {} to {}'.format(len(numpy.where(self.mask==True)),numpy.nanmin(rng),numpy.nanmax(rng)))
+		if pad==True: self.padMask()   
+		if apply==True: self.applyMask()
+		return
+
 
 	def applyWaveCal(self,cal_wave):
 		'''
@@ -1270,6 +1685,206 @@ def typeToNum(input, prefix='',suffix='',verbose=ERROR_CHECKING):
 		return inp
 
 
+def properDate(din,**kwargs):
+	'''
+	:Purpose: Converts various date formats into a standardized date of YYYY-MM-DD
+
+	:param d: Date to be converted.
+	:param format: Optional input format of the following form:
+		* 'YYYY-MM-DD': e.g., 2011-04-03 (this is default output)
+		* 'YYYYMMDD': e.g., 20110403
+		* 'YYMMDD': e.g., 20110403
+		* 'MM/DD/YY': e.g., 03/04/11
+		* 'MM/DD/YYYY': e.g., 03/04/2011
+		* 'YYYY/MM/DD': e.g., 2011/03/04
+		* 'DD/MM/YYYY': e.g., 04/03/2011
+		* 'DD MMM YYYY': e.g., 04 Mar 2011
+		* 'YYYY MMM DD': e.g., 2011 Mar 04
+	:type format: Optional, string
+	:param output: Format of the output based on the prior list
+	:type output: Optional, string
+
+	:Example:
+	>>> import splat
+	>>> splat.properDate('20030502')
+		'2003-05-02'
+	>>> splat.properDate('2003/05/02')
+		'02-2003-05'
+	>>> splat.properDate('2003/05/02',format='YYYY/MM/DD')
+		'2003-05-02'
+	>>> splat.properDate('2003/05/02',format='YYYY/MM/DD',output='YYYY MMM DD')
+		'2003 May 02'
+
+	Note that the default output format can be read into an astropy.time quantity
+	>>> import splat
+	>>> from astropy.time import Time
+	>>> t = Time(splat.properDate('20030502'))
+	>>> print(t)
+		2003-05-02 00:00:00.000
+	'''
+
+	dformat = kwargs.get('format','')
+	oformat = kwargs.get('output','YYYY-MM-DD')
+	if len(din)==0:
+		print('\nCould not determine format of input date {}; please provide a format string\n'.format(din))
+		return ''		
+	d = copy.deepcopy(din)
+	if not isinstance(d,str): d = str(int(d))
+
+# some defaults
+	if '/' in d and dformat == '':	   # default American style
+		if len(d) <= 8:
+			dformat = 'MM/DD/YY'
+		else:
+			dformat = 'MM/DD/YYYY'
+	if True in [c.lower() in d.lower() for c in MONTHS] and dformat == '':
+		if isNumber(d.replace(' ','')[3]):
+			dformat = 'YYYY MMM DD'
+		else:
+			dformat = 'DD MMM YYYY'
+	if 'T' in d and dformat == '':	   # default American style
+		d = d.split('T')[0]
+	if isNumber(d) and dformat == '':
+		if len(str(d)) <= 6:
+			dformat = 'YYMMDD'
+		else:
+			dformat = 'YYYYMMDD'			
+
+# no idea
+	if dformat == '':
+		print('\nCould not determine format of input date {}; please provide a format string\n'.format(din))
+		return ''
+
+# case statement for conversion to YYYY-MM-DD
+	if dformat == 'YYYYMMDD':
+		dp = d[:4]+'-'+d[4:6]+'-'+d[-2:]
+	elif dformat == 'YYMMDD':
+		if int(d[:2]) > 50:
+			dp = '19'+d[:2]+'-'+d[2:4]+'-'+d[-2:]
+		else:
+			dp = '20'+d[:2]+'-'+d[2:4]+'-'+d[-2:]
+	elif dformat == 'MM/DD/YYYY':
+		tmp = d.split('/')
+		if len(tmp[0]) == 1:
+			tmp[0] = '0'+tmp[0]
+		if len(tmp[1]) == 1:
+			tmp[1] = '0'+tmp[1]
+		dp = tmp[2]+'-'+tmp[0]+'-'+tmp[1]
+	elif dformat == 'MM/DD/YY':
+		tmp = d.split('/')
+		if len(tmp[0]) == 1:
+			tmp[0] = '0'+tmp[0]
+		if len(tmp[1]) == 1:
+			tmp[1] = '0'+tmp[1]
+		if int(tmp[2]) > 50:
+			dp = '19'+tmp[2]+'-'+tmp[0]+'-'+tmp[1]
+		else:
+			dp = '20'+tmp[2]+'-'+tmp[0]+'-'+tmp[1]
+	elif dformat == 'YYYY/MM/DD':
+		tmp = d.split('/')
+		if len(tmp[2]) == 1:
+			tmp[2] = '0'+tmp[2]
+		if len(tmp[1]) == 1:
+			tmp[1] = '0'+tmp[1]
+		dp = tmp[0]+'-'+tmp[1]+'-'+tmp[2]
+	elif dformat == 'DD/MM/YYYY':
+		tmp = d.split('/')
+		if len(tmp[0]) == 1:
+			tmp[0] = '0'+tmp[0]
+		if len(tmp[1]) == 1:
+			tmp[1] = '0'+tmp[1]
+		dp = tmp[2]+'-'+tmp[1]+'-'+tmp[0]
+	elif dformat == 'DD/MM/YY':
+		tmp = d.split('/')
+		if len(tmp[0]) == 1:
+			tmp[0] = '0'+tmp[0]
+		if len(tmp[1]) == 1:
+			tmp[1] = '0'+tmp[1]
+		if int(tmp[2]) > 50:
+			dp = '19'+tmp[2]+'-'+tmp[1]+'-'+tmp[0]
+		else:
+			dp = '20'+tmp[2]+'-'+tmp[1]+'-'+tmp[0]
+	elif dformat == 'DD MMM YYYY':
+		tmp = d.split(' ')
+		if len(tmp[0]) == 1:
+			tmp[0] = '0'+tmp[0]
+		for i,c in enumerate(MONTHS):
+			if c.lower() == tmp[1].lower():
+				mref = str(i+1)
+		if len(mref) == 1:
+			mref = '0'+mref
+		dp = tmp[2]+'-'+mref+'-'+tmp[0]
+	elif dformat == 'DD-MMM-YYYY':
+		tmp = d.split(' ')
+		if len(tmp[0]) == 1:
+			tmp[0] = '0'+tmp[0]
+		for i,c in enumerate(MONTHS):
+			if c.lower() == tmp[1].lower():
+				mref = str(i+1)
+		if len(mref) == 1:
+			mref = '0'+mref
+		dp = tmp[2]+'-'+mref+'-'+tmp[0]
+	elif dformat == 'YYYY MMM DD':
+		tmp = d.split(' ')
+		if len(tmp[2]) == 1:
+			tmp[2] = '0'+tmp[2]
+		for i,c in enumerate(MONTHS):
+			if c.lower() == tmp[1].lower():
+				mref = str(i+1)
+		if len(mref) == 1:
+			mref = '0'+mref
+		dp = tmp[0]+'-'+mref+'-'+tmp[2]
+	elif dformat == 'YYYY-MMM-DD':
+		tmp = d.split(' ')
+		if len(tmp[2]) == 1:
+			tmp[2] = '0'+tmp[2]
+		for i,c in enumerate(MONTHS):
+			if c.lower() == tmp[1].lower():
+				mref = str(i+1)
+		if len(mref) == 1:
+			mref = '0'+mref
+		dp = tmp[0]+'-'+mref+'-'+tmp[2]
+	else:
+		dp = d
+
+# case statement for conversion from YYYY-MM-DD to desired output format
+	if oformat == 'YYYYMMDD':
+		df = dp.replace('-','')
+	elif oformat == 'YYMMDD':
+		df = dp.replace('-','')[2:]
+	elif oformat == 'MM/DD/YYYY':
+		tmp = dp.split('-')
+		df = tmp[1]+'/'+tmp[2]+'/'+tmp[0]
+	elif oformat == 'MM/DD/YY':
+		tmp = dp.split('-')
+		df = tmp[1]+'/'+tmp[2]+'/'+tmp[0][2:]
+	elif oformat == 'YYYY/MM/DD':
+		tmp = dp.split('-')
+		df = tmp[0]+'/'+tmp[1]+'/'+tmp[2]
+	elif oformat == 'DD/MM/YYYY':
+		tmp = dp.split('-')
+		df = tmp[2]+'/'+tmp[1]+'/'+tmp[0]
+	elif oformat == 'DD/MM/YY':
+		tmp = dp.split('-')
+		df = tmp[2]+'/'+tmp[1]+'/'+tmp[0][2:]
+	elif oformat == 'DD MMM YYYY':
+		tmp = dp.split('-')
+		df = tmp[2]+' '+MONTHS[int(tmp[1])-1]+' '+tmp[0]
+	elif oformat == 'DD-MMM-YYYY':
+		tmp = dp.split('-')
+		df = tmp[2]+'-'+MONTHS[int(tmp[1])-1]+'-'+tmp[0]
+	elif oformat == 'YYYY MMM DD':
+		tmp = dp.split('-')
+		df = tmp[0]+' '+MONTHS[int(tmp[1])-1]+' '+tmp[2]
+	elif oformat == 'YYYY-MMM-DD':
+		tmp = dp.split('-')
+		df = tmp[0]+'-'+MONTHS[int(tmp[1])-1]+'-'+tmp[2]
+	else:
+		df = dp
+
+	return df
+
+
 
 ############################################################
 # SPECTRUM MANIPULATION FUNCTIONS
@@ -1361,11 +1976,12 @@ def readSpectrum(filename,file_type='',delimiter='\s+',comment='#',columns=['wav
 		else:
 			raise ValueError('Do not recognize file type {}'.format(filename))
 #		for i,c in enumerate(list(pd.columns)): pd.rename(columns={c:column_order[i]},inplace=True)
-		sp = Spectrum(wave=list(pd['wave'])*wave_unit,flux=list(pd['flux'])*flux_unit)
+#		print(filename,pd)
+		sp = Spectrum(wave=numpy.array(pd['wave'])*wave_unit,flux=numpy.array(pd['flux'])*flux_unit)
 		for c in list(pd.columns):
 			if c=='wave' or c=='flux': pass
-			elif c=='unc' or c=='background': setattr(sp,c,list(pd[c])*flux_unit)
-			else: setattr(sp,c,list(pd[c]))
+			elif c=='unc' or c=='background': setattr(sp,c,numpy.array(pd[c])*flux_unit)
+			else: setattr(sp,c,numpy.array(pd[c]))
 		sp.clean()
 		# 	sp.unc = list(pd['unc'])*flux_unit
 		# if 'background' in list(pd.columns): sp.unc = list(pd['unc'])*flux_unit
@@ -3179,7 +3795,7 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 		if 'FIT_ORDER' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): fit_order = int(redux['PARAMETERS']['FLUXCAL'][ref]['FIT_ORDER'])
 		flux_fit_scale = 'linear'
 		if 'FIT_SCALE' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): flux_fit_scale = redux['PARAMETERS']['FLUXCAL'][ref]['FIT_SCALE']
-		fit_range = [6000,9000]
+		fit_range = [5950,9000]
 		if redux['PARAMETERS']['MODE'] == 'BLUE': fit_range=[3500,5550]
 		if 'FIT_RANGE' in list(redux['PARAMETERS']['FLUXCAL'][ref].keys()): fit_range = redux['PARAMETERS']['FLUXCAL'][ref]['FIT_RANGE']
 # reduce data, determine trace and extract spectrum
@@ -3412,242 +4028,6 @@ def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_fil
 # These functions perform some basic analysis on spectra
 ############################################################
 
-# PROGRAM CONSTANTS FOR ANALYSIS
-INDEX_SETS = {
-	'kirkpatrick1991': {'altname': ['kirkpatrick91','kir91'], 'bibcode': '1991ApJS...77..417K', 'indices': {\
-		'K91-A': {'ranges': ([7020,7050]*u.Angstrom,[6960,6990]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
-		'K91-B': {'ranges': ([7375,7385]*u.Angstrom,[7353,7363]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
-		'K91-C': {'ranges': ([8100,8130]*u.Angstrom,[8174,8204]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
-		'K91-D': {'ranges': ([8567,8577]*u.Angstrom,[8537,8547]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
-	}},\
-	'kirkpatrick1995': {'altname': ['kirkpatrick95','kir95'], 'bibcode': '1995AJ....109..797K', 'indices': {\
-		'VO7445': {'ranges': ([7350,7400]*u.Angstrom,[7510,7560]*u.Angstrom,[7420,7470]*u.Angstrom),'scaling':(0.5625,0.4375,1.0), 'method': 'line_scaling', 'sample': 'integrate'},\
-	}},\
-	'kirkpatrick1999': {'altname': ['kirkpatrick','kirkpatrick99','kir99'], 'bibcode': '1999ApJ...519..802K', 'indices': {\
-		'Rb-a': {'ranges': ([.77752,.77852]*u.micron,[.78152,.78252]*u.micron,[.77952,.78052]*u.micron), 'method': 'line', 'sample': 'integrate'},\
-		'Rb-b': {'ranges': ([.79226,.79326]*u.micron,[.79626,.79726]*u.micron,[.79426,.79526]*u.micron), 'method': 'line', 'sample': 'integrate'},\
-		'Na-a': {'ranges': ([.81533,.81633]*u.micron,[.81783,.81883]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'Na-b': {'ranges': ([.81533,.81633]*u.micron,[.81898,.81998]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'Cs-a': {'ranges': ([.84961,.85061]*u.micron,[.85361,.85461]*u.micron,[.85161,.85261]*u.micron), 'method': 'line', 'sample': 'integrate'},\
-		'Cs-b': {'ranges': ([.89185,.89285]*u.micron,[.89583,.89683]*u.micron,[.89385,.89485]*u.micron), 'method': 'line', 'sample': 'integrate'},\
-		'TiO-a': {'ranges': ([.7033,.7048]*u.micron,[.7058,.7073]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'TiO-b': {'ranges': ([.8400,.8415]*u.micron,[.8435,.8470]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'VO-a': {'ranges': ([.7350,.7370]*u.micron,[.7550,.7570]*u.micron,[.7430,.7470]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
-		'VO-b': {'ranges': ([.7860,.7880]*u.micron,[.8080,.8100]*u.micron,[.7960,.8000]*u.micron), 'method': 'sumnum', 'sample': 'integrate'},\
-		'CrH-a': {'ranges': ([.8580,.8600]*u.micron,[.8621,.8641]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'CrH-b': {'ranges': ([.9940,.9960]*u.micron,[.9970,.9990]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'FeH-a': {'ranges': ([.8660,.8680]*u.micron,[.8700,.8720]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'FeH-b': {'ranges': ([.9863,.9883]*u.micron,[.9908,.9928]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'Color-a': {'ranges': ([.9800,.9850]*u.micron,[.7300,.7350]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'Color-b': {'ranges': ([.9800,.9850]*u.micron,[.7000,.7050]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'Color-c': {'ranges': ([.9800,.9850]*u.micron,[.8100,.8150]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'Color-d': {'ranges': ([.9675,.9850]*u.micron,[.7350,.7550]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-	}},\
-	'martin1999': {'altname': ['martin','martin99','mar99'], 'bibcode': '1999AJ....118.2466M', 'indices': {\
-		'PC3': {'ranges': ([.823,.827]*u.micron,[.754,.758]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'PC6': {'ranges': ([.909,.913]*u.micron,[.650,.654]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'CrH1': {'ranges': ([.856,.860]*u.micron,[.861,.865]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'CrH2': {'ranges': ([.984,.988]*u.micron,[.997,1.001]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'FeH1': {'ranges': ([.856,.860]*u.micron,[.8685,.8725]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'FeH2': {'ranges': ([.984,.988]*u.micron,[.990,.994]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'H2O1': {'ranges': ([.919,.923]*u.micron,[.928,.932]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'TiO1': {'ranges': ([.700,.704]*u.micron,[.706,.710]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'TiO2': {'ranges': ([.838,.842]*u.micron,[.844,.848]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'VO1': {'ranges': ([.754,.758]*u.micron,[.742,.746]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-		'VO2': {'ranges': ([.799,.803]*u.micron,[.790,.794]*u.micron), 'method': 'ratio', 'sample': 'integrate'},\
-	}},\
-	'gizis1997': {'altname': ['gizis','gizis97','giz97'], 'bibcode': '', 'indices': {\
-		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avedenom','sample': 'average'},\
-		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-	}},\
-	'hawley2002': {'altname': ['hawley02','hawley','haw02'], 'bibcode': '2002AJ....123.3409H', 'indices': {\
-		'VO-7434': {'ranges': ([7430,7470]*u.Angstrom,[7550,7570]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
-		'VO-7912': {'ranges': ([7900,7980]*u.Angstrom,[8400,8420]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
-		'Na-8190': {'ranges': ([8140,8165]*u.Angstrom,[8173,8210]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
-		'TiO-8440': {'ranges': ([8440,8470]*u.Angstrom,[8400,8420]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
-		'Color-1': {'ranges': ([8900,9100]*u.Angstrom,[7350,7550]*u.Angstrom), 'method': 'ratio', 'sample': 'average'},\
-	}},\
-	'lepine2003': {'altname': ['lepine','lepine03','lep03'], 'bibcode': '', 'indices': {\
-		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avedenom','sample': 'average'},\
-		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO5': {'ranges': [[7126,7135]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'VO1': {'ranges': [[7430, 7470]*u.Angstrom,[7550,7570]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO6': {'ranges': [[7550,7570]*u.Angstrom,[7745,7765]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'VO2': {'ranges': [[7920,7960]*u.Angstrom,[8130,8150]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO7': {'ranges': [[8440, 8470]*u.Angstrom,[8400, 8420]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'Color-M': {'ranges': [[8105, 8155]*u.Angstrom,[6510, 6560]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-	}},\
-	'reid1995': {'altname': ['reid','reid95','rei95'], 'bibcode': '', 'indices': {\
-		'TiO1': {'ranges': [[6718, 6723]*u.Angstrom,[6703, 6708]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO2': {'ranges': [[7058, 7061]*u.Angstrom,[7043, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO3': {'ranges': [[7092, 7097]*u.Angstrom,[7079, 7084]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO4': {'ranges': [[7130, 7135]*u.Angstrom,[7115, 7120]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'TiO5': {'ranges': [[7126, 7135]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'CaH1': {'ranges': [[6380,6390]*u.Angstrom,[6410,6420]*u.Angstrom,[6345,6355]*u.Angstrom],'method': 'avdenom','sample': 'average'},\
-		'CaH2': {'ranges': [[6814, 6846]*u.Angstrom,[7042, 7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'CaH3': {'ranges': [[6960,6990]*u.Angstrom,[7042,7046]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-		'CaOH': {'ranges': [[6230, 6240]*u.Angstrom,[6345, 6354]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-	}},\
-	'burgasser2003': {'altname': ['burgasser','burgasser03','bur03'], 'bibcode': '', 'indices': {\
-		'CsI-A': {'ranges': [[8496.1, 8506.1]*u.Angstrom, [8536.1, 8546.1]*u.Angstrom,[8516.1, 8626.1]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
-		'CsI-B': {'ranges': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
-		'H2O': {'ranges': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'CrH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'CrH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'FeH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'FeH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'Color-e': {'ranges': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-	}},\
-	'burgasser2003': {'altname': ['burgasser','burgasser03','bur03'], 'bibcode': '', 'indices': {\
-		'CsI-A': {'ranges': [[8496.1, 8506.1]*u.Angstrom, [8536.1, 8546.1]*u.Angstrom,[8516.1, 8626.1]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
-		'CsI-B': {'ranges': [[8918.5, 8928.5]*u.Angstrom, [8958.3, 8968.3]*u.Angstrom,[8938.5, 8948.3]*u.Angstrom],'method': 'sumnum_twicedenom','sample': 'average'},\
-		'H2O': {'ranges': [[9220, 9240]*u.Angstrom,[9280, 9300]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'CrH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8610, 8650]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'CrH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9970, 10000]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'FeH-A': {'ranges': [[8560, 8600]*u.Angstrom,[8685, 8725]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'FeH-B': {'ranges': [[9855, 9885]*u.Angstrom,[9905, 9935]*u.Angstrom],'method': 'ratio','sample': 'integrate'},\
-		'Color-e': {'ranges': [[9140, 9240]*u.Angstrom,[8400, 8500]*u.Angstrom],'method': 'ratio','sample': 'average'},\
-	}},\
-	'riddick2006': {'altname': ['riddick','riddick06','rid06'], 'bibcode': '', 'indices': {\
-		'R1': {'ranges': [[8025,8130]*u.Angstrom, [8015,8025]*u.Angstrom],'method': 'ratio','sample': 'median'},\
-		'R2': {'ranges': [[8145,8460]*u.Angstrom, [8460,8470]*u.Angstrom],'method': 'ratio','sample': 'median'},\
-		'R3': {'ranges': [[8025,8130]*u.Angstrom, [8145,8460]*u.Angstrom,[8015,8025]*u.Angstrom, [8460,8470]*u.Angstrom],'method': 'doublesum','sample': 'median'},\
-		'R4': {'ranges': [[8854,8857]*u.Angstrom, [8454,8458]*u.Angstrom,[8873,8878]*u.Angstrom],'method': 'inverse_line','sample': 'median'},\
-	}},\
-	'stauffer1999': {'altname': ['stauffer','stauffer99','sta99'], 'bibcode': '', 'indices': {\
-		'c81': {'ranges': [[8115,8165]*u.Angstrom, [7865,7915]*u.Angstrom,[8490,8540]*u.Angstrom],'method': 'inverse_line','sample': 'median'},\
-	}},\
-	'slesnick2006': {'altname': ['slesnick','slesnick06','sle06'], 'bibcode': '', 'indices': {\
-		'TiO-7140': {'ranges': [[7010,7060]*u.Angstrom, [7115,7165]*u.Angstrom],'method': 'ratio','sample': 'median'},\
-		'TiO-8465': {'ranges': [[8405,8425]*u.Angstrom, [8455,8475]*u.Angstrom],'method': 'ratio','sample': 'median'},\
-		'Na-8189': {'ranges': [[8174,8204]*u.Angstrom, [8135,8165]*u.Angstrom],'method': 'ratio','sample': 'median'},\
-	}},\
-}
-
-EW_SETS = {
-	'mann2013': {'altname': ['mann','mann13','man13'], 'reference': 'Mann et al. (2013)', 'bibcode': '2013AJ....145...52M', 'continuum_fit_order': 1, 'features': {\
-		'f01': {'linecenter': 0.4648*u.micron,'width': 0.00115*u.micron, 'recenter': False,'continuum': [0.461,0.4625,0.468,0.47]*u.micron},\
-		'f02': {'linecenter': 0.5608*u.micron,'width': 0.0010*u.micron,'recenter': False,'continuum': [0.5269,0.5299,0.566,0.5675]*u.micron},\
-		'f03': {'linecenter': 0.6118*u.micron,'width': 0.0010*u.micron, 'recenter': False,'continuum': [0.566,0.5675,0.6586,0.6607]*u.micron},\
-		'f04': {'linecenter': 0.6232*u.micron,'width': 0.0010*u.micron, 'recenter': False,'continuum': [0.566,0.5675,0.6586,0.6607]*u.micron},\
-		'f05': {'linecenter': 0.6416*u.micron,'width': 0.00205*u.micron, 'recenter': False,'continuum': [0.566,0.5675,0.6586,0.6607]*u.micron},\
-		'f06': {'linecenter': 0.7540*u.micron,'width': 0.0010*u.micron, 'recenter': False,'continuum': [0.7390,0.75,0.81,0.816]*u.micron},\
-		'f07': {'linecenter': 0.8208*u.micron,'width': 0.00175*u.micron, 'recenter': False,'continuum': [0.81,0.816,0.823,0.83]*u.micron},\
-		'f08': {'linecenter': 0.8684*u.micron,'width': 0.0013*u.micron, 'recenter': False,'continuum': [0.859,0.892,0.91,0.912]*u.micron},\
-	}},
-}
-
-ZETA_RELATIONS = {
-	'lepine2007': {'altname': ['lepine','lepine07','lep07'],'bibcode':'2007ApJ...669.1235L', 'coeff': [-0.164,0.67,-0.118,-0.05],'range': [], 'classes': [0.825,0.5,0.2]},
-	'lepine2013': {'altname': ['lepine13','lep13'],'bibcode':'', 'coeff': [-0.588,2.211,-1.906,0.622],'range': [], 'classes': [0.825,0.5,0.2]},
-	'dhital2012': {'altname': ['dhital','dhital12','dhi12'], 'reference': 'Dhital et al. (2012)','bibcode':'2012AJ....143...67D', 'coeff': [-0.005,-0.183,0.694,-0.127,-0.047],'range': [], 'classes': [0.825,0.5,0.2]},
-	'zhang2019': {'altname': ['zhang','zhang19','zha19'], 'reference': 'Zhang et al. (2019)','bibcode':'', 'coeff': [-0.1069,0.3863,0.312,-0.2849],'range': [], 'classes': [0.75,0.5,0.2]},
-}
-
-METALLICITY_RELATIONS = {
-	'mann2013': {'altname': ['mann','mann13','man13'], 'reference': 'Mann et al. (2013)', 'bibcode': '2013AJ....145...52M', 'features':['mann2013','hawley2002'],'relations': {
-		'feh-early': {'features': ['f07','f01','f02','Color-1'],'coeff': [0.53,0.26,-0.16,-0.784,-0.34], 'unc': 0.13, 'range': [typeToNum('K5.5'),typeToNum('M2')]},
-		'mh-early': {'features': ['f07','f01','f08','Color-1'],'coeff': [0.38,0.21,0.29,-0.504,-0.79], 'unc': 0.11, 'range': [typeToNum('K5.5'),typeToNum('M2')]},
-		'feh-late': {'features': ['f05','f08','f07','f03','Color-1'],'coeff': [-0.20,0.48,0.24,0.14,-0.204,-0.32], 'unc': 0.14, 'range': [typeToNum('M2'),typeToNum('M6')]},
-		'mh-late': {'features': ['f05','f04','f06','Color-1'],'coeff': [-0.065,-0.071,-0.30,0.719,-0.24], 'unc': 0.11, 'range': [typeToNum('M2'),typeToNum('M6')]},
-	}},
-}
-
-ZETA_METALLICITY_RELATIONS = {
-	'lepine2013': {'altname': ['lepine','lepine13','lep13','lepine-n12','lepine13-n12','lep13-n12'], 'bibcode':'', 'type':'[Fe/H]','coeff': [0.750,-0.743],'unc': 0.383,'range': [0.9,1.2]},
-	'lepine2013-ra12': {'altname': ['lepine-ra12','lepine13-ra12','lep13-ra12'], 'bibcode':'', 'type':'[Fe/H]','coeff': [1.071,-1.096],'unc': 0.654,'range': [0.9,1.2]},
-	'woolf2009': {'altname': ['woolf','woolf09','woo09'], 'bibcode':'2009PASP..121..117W', 'type':'[Fe/H]','coeff': [1.632,-1.685],'unc':0.3,'range': [0.05,1.1]},
-	'mann2013': {'altname': ['mann','mann13','man13'], 'bibcode': '2013AJ....145...52M', 'type':'[Fe/H]','coeff': [1.26,-1.25],'unc': 0.20,'range': [-0.2,1.2]},
-	'mann2013-mh': {'altname': ['mann-mh','mann13-mh','man13-mh'], 'bibcode': '2013AJ....145...52M', 'type':'[M/H]','coeff': [0.88,-0.89],'unc': 0.20,'range': [-0.2,1.2]},
-}
-
-EW_LINES = {
-	'HI': {'altname': ['H','H1','H I'], 'lines': [4861*u.Angstrom,6563*u.Angstrom]},\
-	'LiI': {'altname': ['Li','Li1','Li I'], 'lines': [6708*u.Angstrom]},\
-	'KI': {'altname': ['K','K1','K I'], 'lines': [7665*u.Angstrom,7699*u.Angstrom]},\
-	'NaI': {'altname': ['Na','Na1','Na I'], 'lines': [8183*u.Angstrom,8195*u.Angstrom]},\
-	'CsI': {'altname': ['Cs','Cs1','Cs I'], 'lines': [8521*u.Angstrom,8943*u.Angstrom]},\
-	'RbI': {'altname': ['Rb','Rb1','Rb I'], 'lines': [7800*u.Angstrom,7948*u.Angstrom]},\
-	'MgI': {'altname': ['Mg','Mg1','Mg I'], 'lines': [8806*u.Angstrom]},\
-	'CaI': {'altname': ['Ca','Ca1','Ca I'], 'lines': [6572*u.Angstrom,7209*u.Angstrom,7213*u.Angstrom,7326*u.Angstrom]},\
-	'CaII': {'altname': ['Ca2','Ca II'], 'lines': [8498*u.Angstrom,8542*u.Angstrom,8662*u.Angstrom,]},\
-	'FeI': {'altname': ['Fe','Fe1','Fe I'], 'lines': [7583*u.Angstrom,8327*u.Angstrom,8388*u.Angstrom,8514*u.Angstrom,8824*u.Angstrom,9000*u.Angstrom]},\
-	'TiI': {'altname': ['Ti','Ti1','Ti I'], 'lines': [6085*u.Angstrom,6126*u.Angstrom,6259*u.Angstrom,6743*u.Angstrom,7209*u.Angstrom,7248*u.Angstrom,8382*u.Angstrom,8412*u.Angstrom,8435*u.Angstrom]},\
-}
-
-CHI_RELATIONS = {
-	'schmidt2014': {'altname': ['schmidt','schmidt14'], 'reference': 'Schmidt et al. (2014)','bibcode':'2014PASP..126..642S', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-6,
-		'spt': [17,18,19,20,21,22,23,24,25,26,27], \
-		'values': [10.28,4.26,2.52,1.98,2.25,2.11,1.67,1.16,1.46,1.23,0.73],\
-		'scatter': [3.13,1.18,0.58,0.27,0.11,0.36,0.22,0.3,0.28,0.3,0.3],\
-		},
-	'douglas2014': {'altname': ['douglas','douglas14'], 'reference': 'Douglas et al. (2014)','bibcode':'2014ApJ...795..161D', 'sptoffset': 0, 'method': 'interpolate', 'scale': 1.e-5,
-		'spt': [10,11,12,13,14,15,16,17,18,19], \
-		'values': [6.6453,6.0334,5.2658,4.4872,3.5926,2.4768,1.7363,1.2057,0.6122,0.3522],\
-		'scatter': [0.6207,0.5326,0.5963,0.4967,0.5297,0.4860,0.3475,0.3267,0.2053,0.1432],\
-		},
-}
-
-INDEX_CLASSIFICATION_RELATIONS = {
-	'reid1995': {'altname': ['reid','reid95','rei95'], 'bibcode': '1995AJ....110.1838R', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
-		'TiO5': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-10.775,8.2],'fitunc': 0.5,'offset':0,'log': False}, \
-	}},
-	'gizis1997': {'altname': ['gizis','gizis97','giz97'], 'bibcode': '1997AJ....113..806G', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
-		'TiO5': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-9.64,7.76],'fitunc': 0.5,'offset':0,'log': False}, \
-		'CaH2': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
-		'CaH3': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-18.00,15.80],'fitunc': 0.5,'offset':0,'log': False}, \
-	}},
-	'martin1999': {'altname': ['martin','martin99','mar99','martin1999-m','martin-m','martin99-m','mar99-m'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['martin1999'], 'indices': {\
-		'PC3': {'range': [typeToNum('M2.5'),typeToNum('L1')], 'coeff': [-2.024,11.715,-6.685],'fitunc': 0.28,'offset':0,'log': False}, \
-	}},
-	'martin1999-l': {'altname': ['martin-l','martin99-l','mar99-l'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['martin1999'], 'indices': {\
-		'PC3': {'range': [typeToNum('L1'),typeToNum('L6')], 'coeff': [-0.047,1.181,8.557],'fitunc': 0.54,'offset':0,'log': False}, \
-	}},
-	'lepine2003': {'altname': ['lepine2003-dwarf','lepine','lepine03','lep03','lepine-d','lepine03-d','lep03-d'], 'bibcode': '2003AJ....125.1598L', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
-		'CaH2': {'range': [typeToNum('M0'),typeToNum('M6')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
-		'CaH3': {'range': [typeToNum('M0'),typeToNum('M6')], 'coeff': [-18.00,15.80],'fitunc': 0.5,'offset':0,'log': False}, \
-		'TiO5': {'range': [typeToNum('M0'),typeToNum('M6')], 'coeff': [-9.64,7.76],'fitunc': 0.5,'offset':0,'log': False}, \
-		'VO1': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [-30.5,32.2],'fitunc': 0.5,'offset':0,'log': False}, \
-		'TiO6': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [-11.2,11.9],'fitunc': 0.5,'offset':0,'log': False}, \
-		'VO2': {'range': [typeToNum('M3'),typeToNum('M9')], 'coeff': [-10.5,12.4],'fitunc': 0.5,'offset':0,'log': False}, \
-		'TiO7': {'range': [typeToNum('M3'),typeToNum('M9')], 'coeff': [-11.0,13.7],'fitunc': 0.5,'offset':0,'log': False}, \
-		'Color-M': {'range': [typeToNum('M4'),typeToNum('M8')], 'coeff': [7.5,1.6],'fitunc': 0.5,'offset':0,'log': True}, \
-	}},
-	'lepine2003-sd': {'altname': ['lepine-sd','lepine03-sd','lep03-sd'], 'bibcode': '2003AJ....125.1598L', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
-		'CaH2': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
-		'CaH3': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [-16.02,13.78],'fitunc': 0.5,'offset':0,'log': False}, \
-		'Color-M': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [7.3,-0.6],'fitunc': 0.5,'offset':0,'log': True}, \
-	}},
-	'lepine2003-esd': {'altname': ['lepine-esd','lepine03-esd','lep03-esd'], 'bibcode': '2003AJ....125.1598L', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
-		'CaH2': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [7.91,-20.63,10.71],'fitunc': 0.5,'offset':0,'log': False}, \
-		'CaH3': {'range': [typeToNum('K5'),typeToNum('M7')], 'coeff': [-13.47,11.50],'fitunc': 0.5,'offset':0,'log': False}, \
-		'Color-M': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [22,-4.1],'fitunc': 0.5,'offset':0,'log': True}, \
-	}},
-	'lepine2013': {'altname': ['lepine2013-dwarf','lepine13','lep13','lepine13-d','lep13-d'], 'bibcode': '2013AJ....145..102L', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['lepine2003'], 'indices': {\
-		'CaH2': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [7.99,21.71,11.50],'fitunc': 0.5,'offset':0,'log': False}, \
-		'CaH3': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-21.68,18.80],'fitunc': 0.5,'offset':0,'log': False}, \
-		'TiO5': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-9.55,7.83],'fitunc': 0.5,'offset':0,'log': False}, \
-#		'VO1': {'range': [typeToNum('M2'),typeToNum('M8')], 'coeff': [-71.4,69.8],'fitunc': 0.5,'offset':0,'log': False}, \
-		'TiO6': {'range': [typeToNum('K7'),typeToNum('M6')], 'coeff': [-16.65,21.23,-15.68,9.92],'fitunc': 0.5,'offset':0,'log': False}, \
-#		'VO2': {'range': [typeToNum('M3'),typeToNum('M9')], 'coeff': [-19.59,22.33,-12.47,9.56],'fitunc': 0.5,'offset':0,'log': False}, \
-	}},
-	'riddick2007': {'altname': ['riddick','riddick07','rid07'], 'bibcode': '', 'method': 'polynomial', 'sptoffset': typeToNum('M0'), 'sets': ['kirkpatrick1995','kirkpatrick1999','reid1995','stauffer1999','riddick2006','slesnick2006','lepine2003'], 'indices': {\
-		'VO7445': {'range': [typeToNum('M5'),typeToNum('M8')], 'coeff': [13.078,17.121,5.0881],'fitunc': 0.5,'offset':-0.982,'log': False}, \
-		'VO-a': {'range': [typeToNum('M5'),typeToNum('M8')], 'coeff': [6.7099,11.226,5.0705],'fitunc': 0.5,'offset':-0.982,'log': False}, \
-		'VO-b': {'range': [typeToNum('M3'),typeToNum('M8')], 'coeff': [-325.44,394.28,-156.53,29.469,3.4875],'fitunc': 0.5,'offset':-1.017,'log': False}, \
-		'VO2': {'range': [typeToNum('M3'),typeToNum('M8')], 'coeff': [-14.66,-8.3231,-7.9389,2.6102],'fitunc': 0.5,'offset':-0.963,'log': False}, \
-		'R1': {'range': [typeToNum('M25'),typeToNum('M8')], 'coeff': [60.755,-53.025,21.085,2.8078],'fitunc': 0.5,'offset':-1.044,'log': False}, \
-		'R2': {'range': [typeToNum('M3'),typeToNum('M8')], 'coeff': [8.5121,-14.105,10.503,2.9091],'fitunc': 0.5,'offset':-1.035,'log': False}, \
-		'R3': {'range': [typeToNum('M2.5'),typeToNum('M8')], 'coeff': [52.531,-47.679,19.708,2.8379],'fitunc': 0.5,'offset':-1.035,'log': False}, \
-		'TiO-8465': {'range': [typeToNum('M3'),typeToNum('M8')], 'coeff': [5.6765,-10.142,8.7311,3.2147],'fitunc': 0.5,'offset':-1.085,'log': False}, \
-		'c81': {'range': [typeToNum('M2.5'),typeToNum('M8')], 'coeff': [3.0567,-6.817,8.0558,2.4331],'fitunc': 0.5,'offset':-1.036,'log': False}, \
-	}},
-}
-
-
 
 # HELPFUL FUNCTIONS
 def padWhereArray(w,mx):
@@ -3663,7 +4043,7 @@ def padWhereArray(w,mx):
 
 
 
-def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
+def compareSpectra_full(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
 	'''
 	Compares to spectra to each other and returns the best fit statistic and scale factor
 	Input: spectra objects
@@ -3756,7 +4136,7 @@ def compareSpectra(sp1,sp2orig,fit_range=[],fitcycle=5,sclip=3.,plot=False,plot_
 
 
 
-def compareSpectra_simple(sp1,sp2orig,fit_range=[],exclude_range=[],error_value=numpy.nan,plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
+def compareSpectra(sp1,sp2orig,fit_range=[],exclude_range=[],error_value=numpy.nan,plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
 	'''
 	A stripped down version of compareSpectra() to address errors 
 	'''
@@ -3866,12 +4246,66 @@ def stitchOrders():
 	'''
 	pass
 
-def initializeStandards(spt,sdss=True,folder=SPTSTDFOLDER,reset=False,sd=False,esd=False,usd=False,beta=False,giant=False,gamma=False,verbose=ERROR_CHECKING):
-	'''
-	Read spectral standards into standards structure
-	'''
+def initializeStandards(spt=[],sdss=True,folder=SPTSTDFOLDER,reset=False,sd=False,esd=False,usd=False,beta=False,giant=False,gamma=False,ref='',verbose=ERROR_CHECKING):
+	"""
+	Reads in predefined set of optical spectral templates/standards into program dictionary SPTSTDS
+
+	Parameters
+	----------
+	spt : array, default = []
+		optional 2-element array specifying range of standard spectral types to compare to
+		spectral types can ben defined as strings or numerical values
+		if unspecified, full range of available templates will be read in
+
+	folder : str, default = SPTSTDFOLDER
+		by default, standards are contained within package's SPTSTDFOLDER directory, but an alternate directory can be provided
+
+	sdss : bool, default = True
+		if True, reads in SDSS templates from Bochanski et al., Schmidt et al., and Kesseli et al. 
+		if False, reads in spectral standards from Kirkpatrick et al., Burgasser et al., and Lepine et al.
+
+	reset : bool, default = False
+		if True, replaces existing template in SPTSTDS; if False, skips any templates already read in 
+
+	sd : bool, default = False
+		if True, reads in subdwarf templates from XXXX or standards from Lepine et al. (2007)
+
+	esd : bool, default = False
+		if True, reads in extreme subdwarf templates from XXXX or standards from Lepine et al. (2007)
+
+	usd : bool, default = False
+		if True, reads in ultra subdwarf templates from XXXX or standards from Lepine et al. (2007)
+
+	beta : bool, default = False
+		if True, reads in low gravity standards from XXXX
+
+	gamma : bool, default = False
+		if True, reads in intermediate low gravity standards from XXXX
+
+	giant : bool, default = False
+		if True, reads in giant standards from XXXX
+
+	verbose : bool, default = False
+		if True, give extra feedback  
+
+	Returns
+	-------
+	no output
+		program populates the SPTSTDS dictionary
+
+	Examples
+	--------
+
+	TBD
+
+	See Also
+	--------
+
+	classifyTemplate : determine spectral type by comparison to spectral templates/standards
+
+	""" 	
 	if isinstance(spt,list) == False: spt = [spt]
-	if len(spt) == 0: spt = [0,28]
+	if len(spt) == 0: spt = [60,78]
 	if isinstance(spt[0],float) == True or isinstance(spt[0],int) == True: 
 		if len(spt) == 2: spt = numpy.arange(spt[0],spt[1]+1)
 		spt = [typeToNum(s) for s in spt]
@@ -3887,42 +4321,101 @@ def initializeStandards(spt,sdss=True,folder=SPTSTDFOLDER,reset=False,sd=False,e
 		if s not in list(SPTSTDS.keys()) or reset==True:
 			f = numpy.array(glob.glob('{}/{}*.txt'.format(folder,s.replace('.',''))))
 			if len(f) > 1:
-				if sdss==True and len(f[['SDSS' in x for x in f]])>0: f = f[['SDSS' in x for x in f]]
-# for subdwarfs
-				elif (sd==True or esd==True or usd==True) and len(f[['lepine2007' in x for x in f]])>0: 
-#					print(len(f))
-					f = f[['lepine2007' in x for x in f]]
-				else: pass
+				if sdss==True and len(f[['SDSS_' in x for x in f]])>0: f = f[['SDSS_' in x for x in f]]
+				else: f = f[['SDSS_' not in x for x in f]]
+				if ref!='': f = f[[ref.lower() in x for x in f]]
 			if len(f) > 0:
-				SPTSTDS[s] = readSpectrum(f[0],name='{} STD'.format(s))
+				SPTSTDS[s] = readSpectrum(f[0],name='{} {} STD'.format(s,f[0].split('_')[-2]))
 			else: 
 				if verbose==True: print('Warning: cannot find a spectral standard for type {}'.format(s))
 	return
 
-def classifyTemplate(spec,spt=[],plot_file='',fit_range=[6500,8800],plot=False,verbose=ERROR_CHECKING,**kwargs):
-	'''
-	Classification program using templates from resource library
-	this is a simplified version of program
-	'''
+
+def classifyTemplate(spec,spt=[],template_set=SPTSTDS,fit_range=[6500,8800],output='spt',plot=False,plot_file='',verbose=ERROR_CHECKING,**kwargs):
+	"""
+	Classifies a spectrum by comparing to predefined set of spectral templates/standards
+
+	Parameters
+	----------
+	spec : Spectrum class object
+		Single spectrum class object, should contain wave, flux and unc array elements
+
+	spt : array, default = []
+		optional array specifying range of standard spectral types to compare to
+
+	fit_range : array, default = [6500,8000]
+		optional array specifying wavelength range over which template comparison is to be done, using same format as compareSpectra()
+		can be 2-element array [min,max] or array of 2-element array specifying comparison reginos
+		if an explicit unit is not provided, units are assumed to be in Angstrom
+
+	output : str, default = 'spt'
+		defines what program returns as an output; options are:
+			* 'spt': returns spectral type of best-fit template
+			* 'allmeasures': returns hierarchical dictionary, including overall best-fit spectral type (keyword 'spt'),
+			and for each template a 2-element array giving fit statistic and scale factor
+		alternate names: return, result
+
+	plot : bool, default = False
+		if True, produces a plot comparing source spectrum to best-fit template
+
+	plot_file : string, default = ''
+		optional string specifying file (including full path) to output a plot
+		if plot_file = '', no file is produced and plot is simple displayed 
+
+	verbose : bool, default = False
+		if True, give extra feedback  
+
+	Returns
+	-------
+	str indicating best-fit spectral type
+
+	Examples
+	--------
+
+	TBD
+
+	See Also
+	--------
+
+	classifyTemplate : determine spectral type by comparison to spectral templates/standards
+	compareSpectra : compares two spectra over a given spectral type range, returning fit statistic and optimal scaling factor
+	initializeStandards : reads in predefined set of standards to dictionary
+
+	""" 	
+# alternate keyword names
+	for k in ['return','result']: output = kwargs.get(k,output)
+
+# check inputs
 	if not isinstance(spec,Spectrum): raise('classifyTemplate requires a kastredux Spectrum object as an input')
 	if not isinstance(spt,list): spt = [spt]
 	if len(spt)==0: spt = [50,78]
 	if len(spt)==1: spt = spt*2
 	if len(spt)==2: initializeStandards(spt)
+	if not isinstance(template_set,dict): 
+		print('Warning: template_set must be a dictionary with keys corresponding to spectral types; defaulting to SPTSTDS')
+		template_set = SPTSTDS
 
-	sts = []
-	stds = list(SPTSTDS.keys())
+	sts,scls = [],[]
+	stds = list(template_set.keys())
 	for s in stds:
-		st,scl = compareSpectra_simple(spec,SPTSTDS[s],fit_range=fit_range,error_value=numpy.nan,plot=False,**kwargs)
+		st,scl = compareSpectra(spec,template_set[s],fit_range=fit_range,error_value=numpy.nan,plot=False,**kwargs)
+		scls.append(scl)
 		if numpy.isfinite(st) == False: sts.append(1.e10)
 		elif st <= 0: sts.append(1.e10)
 		else: sts.append(st)
-		if verbose==True: print('\t{}: {:.2f}'.format(SPTSTDS[s],st))
+		if verbose==True: print('\t{}: {:.2f}'.format(s,st))
 	spt = stds[numpy.argmin(sts)]
-	if plot_file != '': st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,error_value=numpy.nan,plot=True,plot_file=plot_file,**kwargs)
-	else: st,scl = compareSpectra_simple(spec,SPTSTDS[spt],fit_range=fit_range,error_value=numpy.nan,plot=plot,**kwargs)
+	if plot_file != '': st,scl = compareSpectra(spec,template_set[spt],fit_range=fit_range,error_value=numpy.nan,plot=True,plot_file=plot_file,**kwargs)
+	else: st,scl = compareSpectra(spec,template_set[spt],fit_range=fit_range,error_value=numpy.nan,plot=plot,**kwargs)
 
-	return spt
+# return desired value
+	if output=='allmeasures':
+		out = {'spt': spt}
+		for i,s in enumerate(stds): out[s] = [sts[i],scls[i]]
+		return out
+	if output=='spt':
+		return spt
+	else: return spt
 
 
 def measureIndex(sp,ranges,sample='median',method='ratio',scaling=[],nsamples=100,clean=False,cleansig=4.,noiseFlag=False,plot=False,verbose=ERROR_CHECKING,**pkwargs):
@@ -3989,7 +4482,8 @@ def measureIndex(sp,ranges,sample='median',method='ratio',scaling=[],nsamples=10
 	See Also
 	--------
 
-	measureIndexSet : measures a predefined set of indices contained in INDICES dictionary
+	measureIndexSet : measures a predefined set of indices contained in INDEX_SETS dictionary
+	classifyIndices : determines a classification using predefined spectral type/index relations in INDEX_CLASSIFICATION_RELATIONS dictionary
 
 	""" 	
 
@@ -4050,11 +4544,15 @@ def measureIndex(sp,ranges,sample='median',method='ratio',scaling=[],nsamples=10
 
 # compute intepolated flux and noise
 #		w = padWhereArray(w,len(sp.wave))
-		f = interp1d(sp.wave.value[w],sp.flux.value[w],bounds_error=False,fill_value=numpy.nan)
-		yNum = f(xNum)
-		if noiseFlag == False:
-			s = interp1d(sp.wave.value[w],sp.unc.value[w],bounds_error=False,fill_value=0.)
-			yNum_e = s(xNum)
+		elif len(w[0]) == 1:
+			yNum = numpy.zeros(len(xNum))+sp.flux.value[w][0]
+			if noiseFlag==False: yNum_e=numpy.zeros(len(xNum))+sp.unc.value[w][0]
+		else:
+			f = interp1d(sp.wave.value[w],sp.flux.value[w],bounds_error=False,fill_value=numpy.nan)
+			yNum = f(xNum)
+			if noiseFlag == False:
+				s = interp1d(sp.wave.value[w],sp.unc.value[w],bounds_error=False,fill_value=0.)
+				yNum_e = s(xNum)
 
 # clean out bad pixels
 # NOTE: CURRENTLY TURNED OFF BY DEFAULT DUE TO ERROR ON POLYFIT LINE
@@ -4073,7 +4571,8 @@ def measureIndex(sp,ranges,sample='median',method='ratio',scaling=[],nsamples=10
 		if (sample == 'integrate'): 
 			w = numpy.where(numpy.logical_and(numpy.isfinite(xNum)==True,numpy.isfinite(yNum)==True))
 			value[i] = trapz(yNum[w],xNum[w])
-		elif (sample == 'average'): value[i] = numpy.nanmean(yNum)
+		elif (sample == 'average'): value[i] = numpy.nanmean(yNum) # temporary override
+		elif (sample == 'average'): value[i] = numpy.nanmedian(yNum)
 		elif (sample == 'sum'): value[i] = numpy.nansum(yNum)
 		elif (sample == 'median'): value[i] = numpy.nanmedian(yNum)
 		elif (sample == 'maximum'): value[i] = numpy.nanmax(yNum)
@@ -4200,6 +4699,7 @@ def measureIndexSet(sp,ref='lepine2003',index_info={},range_keyword='ranges',met
 	--------
 
 	measureIndex : measures a single spectral index
+	classifyIndices : determines a classification using predefined spectral type/index relations in INDEX_CLASSIFICATION_RELATIONS dictionary
 
 	""" 	
 
@@ -4247,15 +4747,76 @@ def measureIndexSet(sp,ref='lepine2003',index_info={},range_keyword='ranges',met
 
 
 
-def classifyIndices(sp,ref='lepine2003',indices={},info=False,nsamples=100,round_flag=False,string_flag=True,output='spt',verbose=ERROR_CHECKING,**kwargs):
-	'''
-	Classification program using spectral indices
+def classifyIndices(sp,ref='lepine2003',indices={},output='spt',info=False,nsamples=100,round_flag=False,string_flag=True,verbose=ERROR_CHECKING,**kwargs):
+	"""
+	Classifies a spectrum based on pre-defined spectral type/index relations
+
+	Parameters
+	----------
+	sp : Spectrum class object
+		Single spectrum class object, should contain wave, flux and unc array elements
+
+	ref : string, default = 'lepine2003'
+		named index set contained in the global variable INDEX_CLASSIFICATION_RELATIONS
+		alternate names: reference, set
+
+	indices : dict, default = {}
+		optional dictionary that provides the relevant index measurements for the spectral type/index relation
+		if not provided, will (re-)measure relevant indices as defined in INDEX_CLASSIFICATION_RELATIONS
+		Structure of dictionary should conform to the following:
+			* series of index name strings, each pointing to a sub-dictionary
+			* each sub-dictionary contains the following elements:
+				* 'ranges': array of 2-element quantities indicating spectral measurement windows
+				* 'sample': method of sampling flux withn spectral windows
+				* 'method': method of combining spectral measurements
+		alternate names: index_measurements, index, index_dict
+
+	output : str, default = 'spt'
+		defines what program returns as an output; options are:
+			* 'spt': returns 2-element tuple of spectral type and uncertainty
+			* 'allmeasures': returns hierarchical dictionary, including 2-element tuple of spectral type and uncertainty (keyword 'result'),
+			and subdictionaries for each index giving index value and uncertainty and corresponding spectral type and uncertainty
+		alternate names: return, result
+
+	nsamples : int, default = 100
+		number of Monte Carlo samples to determine uncertainties
+
+	round_flag : bool, default = False
+		if True, rounds off spectral type to nearest whole number
+
+	string_flag : bool, default = True
+		if True, returns a string-based spectral type (e.g., 'M6.0'), otherwise a numerical type
+
+	info : bool, default = False
+		If True, report out the pre-defined index sets
+		alternate names: information, options, option, available
+
+	verbose : bool, default = False
+		if True, give extra feedback  
+
+	Returns
+	-------
+	2-element tuple of spectral type and uncertainty (output='spt'); OR
+
+	dict of individual index measurements and spectral type and their uncertainties, and overall specrtal type and uncertainty (output='allmeasures')
+
+	Examples
+	--------
+
 	TBD
-	'''
-# keyword parameters
+
+	See Also
+	--------
+
+	measureIndex : measures a single spectral index
+	classifyTemplate : determine spectral type by comparison to spectral templates/standards
+
+	""" 	
+	# keyword parameters
 	for k in ['reference','set']: ref = kwargs.get(k,ref)
 	for k in ['index_measurements','index','index_dict']: indices = kwargs.get(k,indices)
 	for k in ['option','options','information','available']: info = kwargs.get(k,info)
+	for k in ['return','result']: output = kwargs.get(k,output)
 
 # just return information on available sets
 	if info==True:
@@ -4273,7 +4834,7 @@ def classifyIndices(sp,ref='lepine2003',indices={},info=False,nsamples=100,round
 	if tmp==False: raise ValueError('Index classification set {} is not one of the predefined index sets: {}'.format(ref,list(INDEX_CLASSIFICATION_RELATIONS.keys())))
 	method = INDEX_CLASSIFICATION_RELATIONS[tmp]['method']
 	indsets = INDEX_CLASSIFICATION_RELATIONS[tmp]['sets']
-	sptoffset = INDEX_CLASSIFICATION_RELATIONS[tmp]['sptoffset']
+	sptoffset = typeToNum(INDEX_CLASSIFICATION_RELATIONS[tmp]['sptoffset'])
 	index_relations = copy.deepcopy(INDEX_CLASSIFICATION_RELATIONS[tmp]['indices'])
 	if verbose: print('Using index-SpT relation from {} (bibcode: {})'.format(tmp,INDEX_CLASSIFICATION_RELATIONS[tmp]['bibcode']))
 
@@ -4305,14 +4866,20 @@ def classifyIndices(sp,ref='lepine2003',indices={},info=False,nsamples=100,round
 # determine classifications from polynomials
 	if method=='polynomial':
 		for i,index in enumerate(list(index_relations.keys())):
+			rng = [typeToNum(x) for x in index_relations[index]['range']]
 			samp = numpy.polyval(index_relations[index]['coeff'],numpy.random.normal(indices[index][0]+index_relations[index]['offset'],indices[index][1],nsamples))
 			spts[index] =  [numpy.polyval(index_relations[index]['coeff'],indices[index][0]+index_relations[index]['offset'])+sptoffset,(index_relations[index]['fitunc']**2+numpy.nanstd(samp)**2)]
 			if index_relations[index]['log']==True:
 				samp = numpy.polyval(index_relations[index]['coeff'],numpy.random.normal(numpy.log10(indices[index][0]+index_relations[index]['offset']),indices[index][1]/indices[index][0]/numpy.log(10),nsamples))
 				spts[index] =  [numpy.polyval(index_relations[index]['coeff'],numpy.log10(indices[index][0]+index_relations[index]['offset']))+sptoffset,(index_relations[index]['fitunc']**2+numpy.nanstd(samp)**2)]
-			if spts[index][0] >= numpy.nanmin(index_relations[index]['range']) and \
-				spts[index][0] <= numpy.nanmax(index_relations[index]['range']) and \
-				numpy.isfinite(spts[index][0]): msk[i] = 1.
+			if spts[index][0] >= numpy.nanmin(rng) and \
+				spts[index][0] <= numpy.nanmax(rng) and \
+				numpy.isfinite(spts[index][0])==True: msk[i] = 1.
+			if verbose==True:
+				if numpy.isfinite(spts[index][0])==False: print('Index {} rejected due to nan value'.format(index))
+				elif spts[index][0] < numpy.nanmin(rng): print('Index {} = {:.2f} rejected as associated spt {} is below spt limit {}'.format(index,indices[index][0],typeToNum(spts[index][0]),typeToNum(numpy.nanmin(rng))))
+				elif spts[index][0] > numpy.nanmax(rng): print('Index {} = {:.2f} rejected as associated spt {} is above spt limit {}'.format(index,indices[index][0],typeToNum(spts[index][0]),typeToNum(numpy.nanmax(rng))))
+				else: pass
 #			print(index,indices[index][0],index_relations[index]['offset'],spts[index])
 
 
@@ -4322,13 +4889,14 @@ def classifyIndices(sp,ref='lepine2003',indices={},info=False,nsamples=100,round
 			spts[index] = [numpy.nan,numpy.nan]
 			if indices[index][1] > 0.:
 				for i,r in enumerate(index_relations[index]['values']): 
-					if r[0] < indices[index][0] <= r[1]: spts[index] = [index_relations[index]['spt'][i],0.5]
+					if r[0] < indices[index][0] <= r[1]: spts[index] = [typeToNum(index_relations[index]['spt'][i]),0.5]
 			if numpy.isfinite(spts[index][0])==False: msk[i]=0
 
 	else: raise ValueError('Do not understand method {}'.format(param['method']))
 
 # report out individual values
 	if verbose==True: 
+		print('\n')
 		for i,index in enumerate(list(index_relations.keys())):
 			flg = ''
 			if msk[i] == 0.: flg = '*'
@@ -4337,7 +4905,7 @@ def classifyIndices(sp,ref='lepine2003',indices={},info=False,nsamples=100,round
 
 # determine weighted mean with rejection, iterating to deal with indices outside ranges	
 	vals = numpy.array([spts[i][0] for i in list(index_relations.keys())])
-	wts = numpy.array([1/spts[i][1]**2 for i in list(index_relations.keys())])/msk
+	wts = numpy.array([1/spts[i][1]**2 for i in list(index_relations.keys())])*msk
 	w = numpy.where(numpy.isfinite(wts+vals))
 	if len(w) == 0:
 		if verbose==True: print('\nNone of the indices in set {} returned viable values\n'.format(ref))
@@ -4364,7 +4932,7 @@ def classifyIndices(sp,ref='lepine2003',indices={},info=False,nsamples=100,round
 
 
 
-def measureEW(sp,lc,width=0.,recenter=True,absorption=True,continuum=0.,continuum_fit_order=1,npixline=2,output_unit=u.Angstrom,output='ew',plot=False,plot_file='',label='',nsamples=100,verbose=ERROR_CHECKING):
+def measureEW(sp,lc,width=0.,recenter=True,absorption=True,emission=False,continuum=0.,continuum_fit_order=1,npixline=2,output_unit=u.Angstrom,output='ew',plot=False,plot_file='',label='',nsamples=100,verbose=ERROR_CHECKING):
 	'''
 	Program to measure spectral equivalent width
 	TBD
@@ -4385,10 +4953,14 @@ def measureEW(sp,lc,width=0.,recenter=True,absorption=True,continuum=0.,continuu
 	if isUnit(width): line_width = width.to(sp.wave.unit).value
 	else: line_width = copy.deepcopy(width)
 	if not isinstance(line_width,int) and not isinstance(line_width,float):
-		raise ValueError('Line width value should be a single float number; you entered {}'.format(width))		
+		raise ValueError('Line width value should be a single float number; you entered {}'.format(width))	
+	absorption = not emission	
+
 # estimate line width if not provided
 	if float(line_width) == 0.:
 		ic = numpy.nanargmin(numpy.array([numpy.abs(a-line_center) for a in sp.wave.value]))
+#		print(ic,ic+int(npixline),len(sp.wave))
+		if ic<int(npixline) or ic>len(sp.wave)-int(npixline)-1: ic = int(0.5*len(sp.wave))
 		line_width = numpy.absolute(sp.wave.value[ic+int(npixline)]-sp.wave.value[ic-int(npixline)])
 
 # set up continuum		
@@ -4557,9 +5129,9 @@ def measureEWSet(sp,ref='mann2013',**kwargs):
 	return result
 
 
-def zeta(inp,ref='lepine2007',nsamples=100,noiseFlag=False,cah2_name='CaH2',cah3_name='CaH3',tio5_name='TiO5',verbose=ERROR_CHECKING,**kwargs):
+def zeta(inp,ref='lepine2007',metallicity_ref='mann2013',nsamples=100,noiseFlag=False,output='zeta',cah2_name='CaH2',cah3_name='CaH3',tio5_name='TiO5',verbose=ERROR_CHECKING,**kwargs):
 	"""
-	Measures the zeta paramter based on CaH2, CaH3, and TiO5 indices
+	Measures the zeta paramter based on CaH2, CaH3, and TiO5 indices; optionally returns metallicity class
 
 	Parameters
 	----------
@@ -4570,9 +5142,20 @@ def zeta(inp,ref='lepine2007',nsamples=100,noiseFlag=False,cah2_name='CaH2',cah3
 		dictionary keys should include the names assigned to cah2_name, cah3_name, and tio5_name should be presend
 
 	ref : string, default = 'lepine2007'
-		named index set contained in the global variable INDEX_SETS
+		named zeta calibration set contained in the global variable ZETA_RELATIONS
 		alternate names: reference, set
 
+	metallicity_ref : string, default = 'mann2013'
+		named zeta/metallicity calibration relation set contained in the global variable ZETA_METALLICITY_RELATIONS
+		alternate names: metallicity_reference, metallicity_set, z_ref, z_set, z_reference
+
+	output : string, default = 'zeta'
+		what to return; options are:
+
+			* 'zeta' : return tuple of zeta value and uncertainty
+			* 'class' : return classification string
+			* 'allmeasures' or 'all' : return index measures, zeta, and classification in a dict
+			* 'metallicity' or 'z' : return the metallicity based on relations in ZETA_METALLICITY_RELATIONS
 
 	cah2_name : str, default = 'CaH2'
 		defines the dictionary name assigned to CaH2 index measurement
@@ -4611,6 +5194,7 @@ def zeta(inp,ref='lepine2007',nsamples=100,noiseFlag=False,cah2_name='CaH2',cah3
 
 # keyword parameters
 	for k in ['reference','set']: ref = kwargs.get(k,ref)
+	for k in ['metallicity_reference','metallicity_set','z_ref','z_set','z_reference']: metallicity_ref = kwargs.get(k,metallicity_ref)
 
 # check ref is in ZETA_RELATIONS
 	tmp = checkDict(ref,ZETA_RELATIONS)
@@ -4639,8 +5223,49 @@ def zeta(inp,ref='lepine2007',nsamples=100,noiseFlag=False,cah2_name='CaH2',cah3
 		zeta_samp = (numpy.ones(nsamples)-numpy.random.normal(indices[tio5_name][0],indices[tio5_name][1],nsamples))/(numpy.ones(nsamples)-tio_ref_samp)
 		e_zeta = numpy.nanstd(zeta_samp)
 
-	return zeta, e_zeta
+# class
+	zclass = 'd'
+	if zeta<0.825: zclass = 'sd'
+	if zeta<0.5: zclass = 'esd'
+	if zeta<0.2: zclass = 'usd'
+	if verbose==True: print('\tzeta = {:.3f}+/-{:.3f} => {}'.format(zeta,e_zeta,zclass))
 
+# metallicity
+# check ref is in ZETA_METALLICITY_RELATIONS
+	z, e_z = numpy.nan, numpy.nan
+	tmp2 = checkDict(metallicity_ref,ZETA_METALLICITY_RELATIONS)
+	if tmp2==False: 
+		if verbose==True: print('Reference {} is not one of the predefined zeta metallicity calibrations: {}'.format(ref,list(ZETA_METALLICITY_RELATIONS.keys())))
+	else:
+		verbose: print('Determining zeta-based metallicity using the {} relation (bibcode: {})'.format(tmp2,ZETA_METALLICITY_RELATIONS[tmp2]['bibcode']))
+
+		z_type = ZETA_METALLICITY_RELATIONS[tmp2]['type']
+		z_coeff = ZETA_METALLICITY_RELATIONS[tmp2]['coeff']
+		z_unc = ZETA_METALLICITY_RELATIONS[tmp2]['unc']
+		z_range = ZETA_METALLICITY_RELATIONS[tmp2]['range']
+
+		if zeta < numpy.nanmin(z_range) or zeta > numpy.nanmax(z_range): 
+			print('zeta = {} is outside range for {} relation: {} to {}'.format(zeta,tmp2,numpy.nanmin(z_range),numpy.nanmax(z_range)))
+			
+		else:
+			z = numpy.polyval(z_coeff,zeta)
+			e_z = z_unc
+			if e_zeta<= 0.: noiseFlag=True
+			if noiseFlag==False:
+				zs = numpy.polyval(z_coeff,numpy.random.normal(zeta,e_zeta,nsamples))
+				e_z = (z_unc**2+numpy.nanstd(zs)**2)**0.5
+			if verbose: print('{} = {:.2f}+/-{:.2f}'.format(z_type,z,e_z))
+
+# return based on output
+	if output=='class': return zclass
+	elif output=='metallicity' or output=='z': return z,e_z
+	elif output=='allmeasures' or output=='all':
+		output = {'zeta_reference': tmp, 'metallicity_reference': tmp2, 'indices': indices, 'zeta': (zeta,e_zeta), 'class': zclass}
+		if numpy.isfinite(z): 
+			output['metallicity_reference'] = tmp2
+			output[z_type] = (z,e_z)
+		return output
+	else: return zeta, e_zeta
 
 
 
@@ -4780,8 +5405,12 @@ def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',spt=None,output='loglhalbol',n
 
 # measure everything if this is a spectrum
 	if isinstance(inp,Spectrum):
-		if spt==None: spt = typeToNum(classifyTemplate(inp))
-		if e_ew<=0.: ew,e_ew = measureEW(inp,6563.,recenter=True,absorption=False)
+		if spt==None: 
+			spt = typeToNum(classifyTemplate(inp))
+			if verbose==True: print('Determined a spectral type of {}'.format(spt))
+		if e_ew<=0.: 
+			ew,e_ew = measureEW(inp,6563.,recenter=True,absorption=False)
+			if verbose==True: print('Measured Halpa equivalent width of {:.2f}+/-{:.2f}'.format(ew,e_ew))
 	elif isinstance(inp,str):
 		spt = typeToNum(inp)
 	elif isinstance(inp,int) or isinstance(inp,float):
@@ -4810,7 +5439,7 @@ def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',spt=None,output='loglhalbol',n
 	chi = f(spt-typeToNum('K0'))*chi_scale
 	f = interp1d(chi_spt,chi_unc)
 	e_chi = f(spt-typeToNum('K0'))*chi_scale
-	if verbose: print('chi = {}+/-{}'.format(chi,e_chi))
+	if verbose: print('chi = {:.3e}+/-{:.3e}'.format(chi,e_chi))
 	if output=='chi': return chi, e_chi
 
 # compute LHa/Lbol
@@ -4823,74 +5452,14 @@ def chiFactor(inp,ew=0.,e_ew=0.,ref='schmidt2014',spt=None,output='loglhalbol',n
 		samp = numpy.random.normal(chi,e_chi,nsamples)*numpy.random.normal(ew,e_ew,nsamples)
 		e_lhalbol = numpy.nanstd(samp)
 
-	if verbose: print('LHa/Lbol = {}+/-{}'.format(lhalbol,e_lhalbol))
+	if verbose: print('LHa/Lbol = {:.3e}+/-{:.3e}'.format(lhalbol,e_lhalbol))
 	if output=='lhalbol': return lhalbol, e_lhalbol
 	else: return numpy.log10(lhalbol), (e_lhalbol/lhalbol)/numpy.log(10)
 
 
-def zeta_metallicity(inp,zeta=0.,e_zeta=0.,ref='mann2013',nsamples=100,noiseFlag=False,verbose=ERROR_CHECKING,**kwargs):
-	"""
-	Determines metallicity based on zeta value
-
-	Parameters
-	----------
-
-	Returns
-	-------
-	tuple of floats
-		metallicity ([Fe/H] or [M/H]) and its uncertainty
-
-	Examples
-	--------
-
-	TBD
-
-	See Also
-	--------
-
-	zeta : measures zeta based on indices
-	metallicity : measures metallicity based on indices
-
-	""" 	
-
-# keyword parameters
-	for k in ['reference','set']: ref = kwargs.get(k,ref)
 
 
-# measure everything if this is a spectrum
-	if isinstance(inp,Spectrum):
-		if e_zeta<=0. or zeta==0.: zeta,e_zeta = zeta(inp,ref=ref,verbose=verbose,nsamples=nsamples,noiseFlag=noiseFlag)
-	elif isinstance(inp,float):
-		zeta = copy.deepcopy(inp)
-	else: raise ValueError('Input parameter should be a Spectrum object or zeta value; you passed a {}'.format(type(inp)))
-
-# compute chi
-# check ref is in CHI_RELATIONS
-	tmp = checkDict(ref,ZETA_METALLICITY_RELATIONS)
-	if tmp==False: raise ValueError('Reference {} is not one of the predefined calibrations: {}'.format(ref,list(ZETA_METALLICITY_RELATIONS.keys())))
-	if verbose: print('Determining zeta-based metallicity using the {} relation (bibcode: {})'.format(tmp,ZETA_METALLICITY_RELATIONS[tmp]['bibcode']))
-
-	z_type = ZETA_METALLICITY_RELATIONS[tmp]['type']
-	z_coeff = ZETA_METALLICITY_RELATIONS[tmp]['coeff']
-	z_unc = ZETA_METALLICITY_RELATIONS[tmp]['unc']
-	z_range = ZETA_METALLICITY_RELATIONS[tmp]['range']
-
-	if zeta < numpy.nanmin(z_range) or zeta > numpy.nanmax(z_range): 
-		print('zeta = {} is outside range for {} relation: {} to {}'.format(zeta,tmp,numpy.nanmin(z_range),numpy.nanmax(z_range)))
-		return numpy.nan, numpy.nan
-
-	z = numpy.polyval(z_coeff,zeta)
-	e_z = z_unc
-	if e_zeta<= 0.: noiseFlag=True
-	if noiseFlag==False:
-		zs = numpy.polyval(z_coeff,numpy.random.normal(zeta,e_zeta,nsamples))
-		e_z = (z_unc**2+numpy.nanstd(zs)**2)**0.5
-
-	if verbose: print('() = {:.2f}+/-{:.2f}'.format(z_type,z,e_z))
-	return z,e_z
-
-
-def theWorks(sp,measure_classification=True,classification_plot='',classification_range=[6200,7500],measure_index_set=True,index_sets=list(INDEX_SETS.keys()),measure_index_classification=True,index_class_sets=list(INDEX_CLASSIFICATION_RELATIONS.keys()),measure_zeta=True,zeta_sets=list(ZETA_RELATIONS.keys()),zeta_ref_default='lepine2013',measure_zeta_metallicity=True,zeta_metallicity_sets=list(ZETA_METALLICITY_RELATIONS.keys()),measure_halpha=True,halpha_sets=list(CHI_RELATIONS.keys()),measure_lines=True,line_sets=list(EW_LINES.keys()),verbose=True):
+def theWorks(sp,measure_classification=True,classification_plot='',classification_range=[6200,7500],measure_index_set=True,index_sets=list(INDEX_SETS.keys()),measure_index_classification=True,index_class_sets=list(INDEX_CLASSIFICATION_RELATIONS.keys()),measure_zeta=True,zeta_sets=list(ZETA_RELATIONS.keys()),zeta_ref_default='lepine2013',measure_zeta_metallicity=True,zeta_metallicity_sets=list(ZETA_METALLICITY_RELATIONS.keys()),measure_halpha=True,halpha_sets=list(CHI_RELATIONS.keys()),measure_lines=True,line_sets=list(EW_LINES.keys()),measure_temperature=True,nsamples=100,verbose=ERROR_CHECKING):
 	"""
 	Conducts a full analysis of a spectrum
 
@@ -4953,15 +5522,10 @@ def theWorks(sp,measure_classification=True,classification_plot='',classificatio
 		zetas = {}
 		if verbose==True: print('\nZeta:')
 		for zset in zeta_sets:
-			z,z_e = zeta(sp,ref=zset)
-			zclass = 'd'
-			if z<0.825: zclass = 'sd'
-			if z<0.5: zclass = 'esd'
-			if z<0.2: zclass = 'usd'
+			zout = zeta(sp,ref=zset,output='all')
+			zetas[zset] = {'zeta': zout['zeta'], 'zclass': zout['class']}
 			if verbose==True:
-				print('\t{}: {:.3f}+/-{:.3f} => {}'.format(zset,z,z_e,zclass))
-#				print('\tEquivalent metallicity = {:.3f}'.format(1.26*z-1.25))
-			zetas[zset] = {'zeta': (z,z_e), 'zclass': zclass}
+				print('\t{}: {:.3f}+/-{:.3f} => {}'.format(zset,zetas[zset]['zeta'][0],zetas[zset]['zeta'][1],zetas[zset]['zclass']))
 		output['zeta'] = zetas
 
 # zeta metallicity
@@ -4970,7 +5534,7 @@ def theWorks(sp,measure_classification=True,classification_plot='',classificatio
 		if verbose==True: print('\nZeta metallicity for {}:'.format(zeta_ref_default))
 		z,z_e = zeta(sp,ref=zeta_ref_default)
 		for zset in zeta_metallicity_sets:
-			zms[zset] = zeta_metallicity(z,e_zeta=z_e,ref=zset)
+			zms[zset] = zeta(sp,ref=zeta_ref_default,metallicity_ref=zset,output='metallicity')
 			if verbose==True:
 				print('\t{}: {:.2f}+/-{:.2f}'.format(zset,zms[zset][0],zms[zset][1]))
 		output['zeta_metallicity'] = zms
@@ -4997,6 +5561,24 @@ def theWorks(sp,measure_classification=True,classification_plot='',classificatio
 				print('\t{}'.format(elem))
 				for k in ews[elem].keys(): print('\t\t{}: {:.2f}+/-{:.2f}'.format(k,ews[elem][k][0],ews[elem][k][1]))
 		output['lines'] = ews
+
+# teff - using Woolf et al. 2009 relation
+	if measure_temperature==True and 'KI' in list(output['lines'].keys()) and 'CaII' in list(output['lines'].keys()):
+		if verbose==True: print('\nTeff from EWs:')
+		ratio = (output['lines']['CaII']['CaII-8498'][0].value+output['lines']['CaII']['CaII-8542'][0].value+output['lines']['CaII']['CaII-8662'][0].value)/output['lines']['KI']['KI-7699'][0].value
+		teff = 3222+83*ratio
+		ratios = (numpy.random.normal(output['lines']['CaII']['CaII-8498'][0].value,output['lines']['CaII']['CaII-8498'][1].value,nsamples)+\
+			numpy.random.normal(output['lines']['CaII']['CaII-8542'][0].value,output['lines']['CaII']['CaII-8542'][1].value,nsamples)+\
+			numpy.random.normal(output['lines']['CaII']['CaII-8662'][0].value,output['lines']['CaII']['CaII-8662'][1].value,nsamples))/\
+			numpy.random.normal(output['lines']['KI']['KI-7699'][0].value,output['lines']['KI']['KI-7699'][1].value,nsamples)
+		if teff > 3500 and teff < 4100:
+			output['teff-ew'] = (teff,(100**2+numpy.nanstd(3222+83*ratios)**2)**0.5)
+			if verbose==True:
+				print('\tTeff = {:.0f}+/-{:.0f} K'.format(output['teff-ew'][0],output['teff-ew'][1]))
+		else:
+			output['teff-ew'] = (numpy.nan,numpy.nan)
+			if verbose==True:
+				print('\tEquivalent widths out of range for Woolf et al. (2009) Teff relation')
 
 # halpha emission
 	if measure_halpha==True:
