@@ -44,7 +44,7 @@ warnings.simplefilter('ignore', numpy.RankWarning)
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2022.07.19'
+VERSION = '2022.12.09'
 __version__ = VERSION
 CODE_PATH = os.path.dirname(os.path.abspath(__file__))
 GITHUB_URL = 'https://github.com/aburgasser/kastredux/'
@@ -63,7 +63,7 @@ BIBCODE = ''
 print('\n\nWelcome to the KASTredux reduction package!')
 print('This package was developed by Adam Burgasser (aburgasser@ucsd.edu)')
 print('You are currently using version {}'.format(VERSION))
-#print('If you make use of any features of this toolkit for your research, please remember to cite the SPLAT paper:')
+#print('If you make use of any features of this toolkit for your research, please remember to cite the Kastredux paper:')
 #print('\n{}; Bibcode: {}\n'.format(CITATION,BIBCODE))
 print('If you make use of any spectra or models in this package, please remember to cite the original source.')
 print('Please report any errors are feature requests to our github page, {}\n\n'.format(GITHUB_URL))
@@ -74,14 +74,14 @@ print('Please report any errors are feature requests to our github page, {}\n\n'
 
 FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
 FLUXCALS = {
-	'BD28+4211': {'FILE' : 'fbd28d4211.dat'},
-	'FEIGE34': {'FILE' : 'ffeige34.dat'},
-	'FEIGE66': {'FILE' : 'ffeige66.dat'},
-	'FEIGE67': {'FILE' : 'ffeige67.dat'},
-	'FEIGE110': {'FILE' : 'ffeige110.dat'},
-	'HILTNER600': {'FILE' : 'fhilt600.dat'},
-	'LTT7987': {'FILE' : 'fltt7987.dat'},
-	'PG1708+602': {'FILE' : 'fpg1708602.dat'},
+	'HILTNER600': {'FILE' : 'fhilt600.dat','DESIGNATION': 'J06451337+0208146'},
+	'FEIGE34': {'FILE' : 'ffeige34.dat','DESIGNATION': 'J10393674+4306092'},
+	'FEIGE66': {'FILE' : 'ffeige66.dat','DESIGNATION': 'J12372352+2503598'},
+	'FEIGE67': {'FILE' : 'ffeige67.dat','DESIGNATION': 'J12415179+1731197'},
+	'PG1708+602': {'FILE' : 'fpg1708602.dat','DESIGNATION': 'J17091588+6010108'},
+	'LTT7987': {'FILE' : 'fltt7987.dat','DESIGNATION': 'J20105686-3013064'},
+	'BD28+4211': {'FILE' : 'fbd28d4211.dat','DESIGNATION': 'J21511102+2851504'},
+	'FEIGE110': {'FILE' : 'ffeige110.dat','DESIGNATION': 'J23195840-0509561'},
 }
 
 SPTSTDFOLDER = CODE_PATH+'/resources/spectral_standards/'
@@ -584,11 +584,15 @@ class Spectrum(object):
 		for k in ['wave','flux','unc','variance','background','mask']: 
 			if not isinstance(getattr(self,k),numpy.ndarray): setattr(self,k,numpy.array(getattr(self,k)))
 		if len(self.flux) == 0: raise ValueError('Spectrum object must be initiated with a flux array')
+		if isUnit(self.flux) == False: self.flux*=DEFAULT_FLUX_UNIT
 		if len(self.wave) == 0: self.wave = numpy.arange(len(self.flux))
+		if isUnit(self.wave) == False: self.wave*=DEFAULT_WAVE_UNIT
 		if len(self.unc) == 0: self.unc = numpy.array([numpy.nan]*len(self.flux))*self.flux.unit
 #		if len(self.unc) == 0: self.unc = numpy.zeros(len(self.flux))
+		if isUnit(self.unc) == False: self.unc*=self.flux.unit
 		if len(self.variance) == 0: self.variance = self.unc**2
 		if len(self.background) == 0: self.background = numpy.zeros(len(self.flux))*self.flux.unit
+		if isUnit(self.background) == False: self.background*=self.flux.unit
 		if len(self.mask) == 0: self.mask = numpy.array([False]*len(self.flux))
 # set units
 #		for k in list(default_units.keys()):
@@ -898,7 +902,7 @@ class Spectrum(object):
 			self.history.append('Spectrum normalized')
 		return
 
-	def smooth(self,scale,method='median'):
+	def smooth(self,scale,method='hanning'):
 		'''
 		Apply a smoothing profile
 		currently this is hanning or median
@@ -909,13 +913,16 @@ class Spectrum(object):
 			for k in ['flux','unc','background']:
 				setattr(self,k,(signal.convolve(getattr(self,k).value,smwin,mode='same')/numpy.sum(smwin))*getattr(self,k).unit)
 
+# NOTE: THIS IS PRODUCING INCORRECT VECTOR ARRAY
+# REPLACE WITH SCIPY.SIGNAL.MEDFILT
 		elif method=='median':
+			wv = self.wave.value
 			xsamp = numpy.arange(0,len(self.wave)-scale+1,scale)
 #			self.wave = numpy.array([self.wave.value[x+int(0.5*scale)] for x in xsamp])*self.wave.unit
 			for k in ['wave','flux','unc','background']:
 				repl = []
 				for x in xsamp: 
-					if len(repl)<len(self.flux.value):
+					if len(repl)<len(wv):
 						repl.extend([numpy.nanmedian(getattr(self,k).value[x:x+scale])]*scale)
 				setattr(self,k,numpy.array(repl)*getattr(self,k).unit)
 #			setattr(self,k,numpy.array([numpy.nanmedian(getattr(self,k).value[x:x+scale]) for x in xsamp])*getattr(self,k).unit)
@@ -1239,6 +1246,7 @@ class Spectrum(object):
 		fig.set_ylim(kwargs.get('ylim',[numpy.nanmin(self.flux.value),numpy.nanmax(self.flux.value)]))
 		fig.set_xlabel(kwargs.get('xlabel',r'Wavelength ({})'.format(self.wave.unit)),fontsize=kwargs.get('fontsize',16))
 		fig.set_ylabel(kwargs.get('xlabel',r'Flux ({})'.format(self.flux.unit)),fontsize=kwargs.get('fontsize',16))
+		plt.tight_layout()
 #		fig.set_xticks(fontsize=kwargs.get('fontsize',16))
 #		fig.set_yticks(fontsize=kwargs.get('fontsize',16))
 #		fig.show()
@@ -1322,14 +1330,14 @@ def checkDict(ref,refdict,altref='altname',replace=[],verbose=ERROR_CHECKING):
 		None
 
 	Output:
-		A string containing SPLAT's default name for a given reference set, or False if that reference is not present
+		A string containing the default name for a given reference set, or False if that reference is not present
 
 	Example:
 
-	>>> import splat
-	>>> print(splat.checkEmpiricalRelation('filippazzo',splat.SPT_LBOL_RELATIONS))
+	>>> import kastredux
+	>>> print(kastredux.checkEmpiricalRelation('filippazzo',kastredux.SPT_LBOL_RELATIONS))
 		filippazzo2015
-	>>> print(splat.checkEmpiricalRelation('burgasser',splat.SPT_BC_RELATIONS))
+	>>> print(kastredux.checkEmpiricalRelation('burgasser',kastredux.SPT_BC_RELATIONS))
 		False
 	'''
 	output = False
@@ -1622,14 +1630,14 @@ def typeToNum(input, prefix='',suffix='',verbose=ERROR_CHECKING):
 		The number or string of a spectral type
 
 	:Example:
-		>>> import splat
-		>>> print splat.typeToNum(30)
+		>>> import kastredux
+		>>> print kastredux.typeToNum(30)
 			T0.0
-		>>> print splat.typeToNum('T0.0')
+		>>> print kastredux.typeToNum('T0.0')
 			30.0
-		>>> print splat.typeToNum(27, peculiar = True, uncertainty = 1.2, lumclass = 'II')
+		>>> print kastredux.typeToNum(27, peculiar = True, uncertainty = 1.2, lumclass = 'II')
 			L7.0IIp:
-		>>> print splat.typeToNum(50)
+		>>> print kastredux.typeToNum(50)
 			Spectral type number must be between 0 (K0) and 49.0 (Y9)
 			nan
 	'''
@@ -1685,6 +1693,98 @@ def typeToNum(input, prefix='',suffix='',verbose=ERROR_CHECKING):
 		return inp
 
 
+def designationToCoordinate(value, icrs=True, **kwargs):
+	'''
+	:Purpose: Convert a designation string into a RA, Dec tuple or ICRS SkyCoord objects (default)
+
+	:param value: Designation string with RA measured in hour angles and Dec in degrees
+	:type value: required
+	:param icrs: returns astropy SkyCoord coordinate in ICRS frame if ``True``
+	:type icrs: optional, defualt = True
+
+	:Output: Coordinate, either as [RA, Dec] or SkyCoord object
+
+	:Example:
+	>>> import kastredux
+	>>> kastredux.designationToCoordinate('J1555264+0954120')
+	<SkyCoord (ICRS): (ra, dec) in deg
+		(238.8585, 9.90333333)>
+	'''
+
+# remove any unnecessary symbols or trailing letters
+	a = re.sub('[j.:hms]','',str(value).lower())
+	a = re.sub(' ','0',a)
+	while not isNumber(a[-1]): a=a[:-1]
+	fact = 1.
+	spl = a.split('+')
+	if len(spl) == 1:
+		spl = a.split('-')
+		fact = -1.
+	if len(spl) == 1:
+		raise ValueError('Input quantity {} is not a proper designation (missing +/-)'.format(value))
+	ra = 15.*float(spl[0][0:2])
+	if (len(spl[0]) > 2):
+		ra+=15.*float(spl[0][2:4])/60.
+	if (len(spl[0]) > 4):
+		ra+=15.*float(spl[0][4:6])/3600.
+	if (len(spl[0]) > 6):
+		ra+=15.*float(spl[0][6:8])/360000.
+	dec = float(spl[1][0:2])
+	if (len(spl[1]) > 2):
+		dec+=float(spl[1][2:4])/60.
+	if (len(spl[1]) > 4):
+		dec+=float(spl[1][4:6])/3600.
+	if (len(spl[1]) > 6):
+		dec+=float(spl[1][6:8])/360000.
+	dec*=fact
+	if icrs == True: return SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame='icrs')
+	else: return [ra,dec]
+
+
+def properCoordinates(c,frame='icrs',icrs=True,**kwargs):
+	'''
+	:Purpose: Converts various coordinate forms to the proper SkyCoord format. Convertible forms include lists and strings.
+
+	:param c: coordinate to be converted. Can be a list (ra, dec) or a string.
+
+	:Example:
+	>>> import kastredux
+	>>> print kastredux.properCoordinates([104.79, 25.06])
+		<SkyCoord (ICRS): ra=104.79 deg, dec=25.06 deg>
+	>>> print kastredux.properCoordinates('06:59:09.60 +25:03:36.0')
+		<SkyCoord (ICRS): ra=104.79 deg, dec=25.06 deg>
+	>>> print kastredux.properCoordinates('J06590960+2503360')
+		<SkyCoord (ICRS): ra=104.79 deg, dec=25.06 deg>
+	'''
+	if isinstance(c,SkyCoord):
+		output = c
+	elif isinstance(c,list):
+		output = SkyCoord(c[0]*u.deg,c[1]*u.deg,frame=frame)
+
+# input is sexigessimal string - assumed ICRS
+	elif isinstance(c,str):
+		if c[0] == 'J':
+			output = designationToCoordinate(c,**kwargs)
+		else:
+			output = SkyCoord(c,frame='icrs', unit=(u.hourangle, u.deg))
+	else:
+		raise ValueError('\nCould not parse input format\n\n')
+
+# add distance
+	if kwargs.get('distance',False) != False:
+		d = copy.deepcopy(kwargs['distance'])
+		if not isUnit(d): d=d*u.pc
+		d.to(u.pc)
+		output = SkyCoord(output,distance = d)
+#		except:
+#			print('\nWarning: could not integrate distance {} into coordinate'.format(distance))
+
+# convert to icrs by default
+	if icrs == True: return output.icrs
+	else: return output
+
+
+
 def properDate(din,**kwargs):
 	'''
 	:Purpose: Converts various date formats into a standardized date of YYYY-MM-DD
@@ -1705,20 +1805,20 @@ def properDate(din,**kwargs):
 	:type output: Optional, string
 
 	:Example:
-	>>> import splat
-	>>> splat.properDate('20030502')
+	>>> import kastredux
+	>>> kastredux.properDate('20030502')
 		'2003-05-02'
-	>>> splat.properDate('2003/05/02')
+	>>> kastredux.properDate('2003/05/02')
 		'02-2003-05'
-	>>> splat.properDate('2003/05/02',format='YYYY/MM/DD')
+	>>> kastredux.properDate('2003/05/02',format='YYYY/MM/DD')
 		'2003-05-02'
-	>>> splat.properDate('2003/05/02',format='YYYY/MM/DD',output='YYYY MMM DD')
+	>>> kastredux.properDate('2003/05/02',format='YYYY/MM/DD',output='YYYY MMM DD')
 		'2003 May 02'
 
 	Note that the default output format can be read into an astropy.time quantity
-	>>> import splat
+	>>> import kastredux
 	>>> from astropy.time import Time
-	>>> t = Time(splat.properDate('20030502'))
+	>>> t = Time(kastredux.properDate('20030502'))
 	>>> print(t)
 		2003-05-02 00:00:00.000
 	'''
@@ -1941,7 +2041,7 @@ def readSpectrum(filename,file_type='',delimiter='\s+',comment='#',columns=['wav
 
 # fits - only in special case at the moment
 	if ftype in ['fit','fits'] or file_type in ['fits','fit']:
-		with fits.open(os.path.normpath(filename),ignore_missing_end=True,do_not_scale_image_data=True) as data:
+		with fits.open(os.path.normpath(filename),ignore_missing_simple=True,ignore_missing_end=True,do_not_scale_image_data=True) as data:
 			data.verify('silentfix+ignore')
 			if 'NAXIS3' in list(data[0].header.keys()):
 				d = numpy.copy(data[0].data[0,:,:])
@@ -2181,7 +2281,7 @@ def crRejectCombine(ims,sclip=1.,nfitcycle=5,rejlimit=0.01,scliplimit=10.,smooth
 				msk = diff*0
 				rejflag=True
 		msks.append(msk)
-		if verbose==True: print('CR Reject on image {} rejected {} pixels, {}\% of total'.format(i,numpy.sum(msk),100.*numpy.sum(msk)/numpy.size(msk)))
+		if verbose==True: print('CR Reject on image {} rejected {:.0f} pixels, {:.2f}% of total'.format(i,numpy.sum(msk),100.*numpy.sum(msk)/numpy.size(msk)))
 	msks = numpy.array(msks)
 	imc = numpy.nanmedian(ims,axis=0)
 	imcc = copy.deepcopy(imc)
@@ -2244,6 +2344,189 @@ def computeVariance():
 # KAST IMAGE REDUCTION FUNCTIONS
 # These functions contain primary reduction steps for imaging data
 ############################################################
+
+def makeInstructions(folder,outfolder='',red_file='input.txt',blue_file='input_blue.txt',red_prefix=INSTRUMENT_MODES['RED']['PREFIX'],blue_prefix=INSTRUMENT_MODES['BLUE']['PREFIX'],red_center=380,blue_center=160,comment='',savelog=False,verbose=False):
+	'''
+	:Purpose:
+
+		Generates a readable instruction file for batch reduction
+
+	:Required Inputs: 
+
+		:param folder: full path to folder containing data files
+
+	:Optional Inputs: 
+
+		:param outfolder='#': path to folder to store intructions and logs; if not given will default to folder+'../reduction/'
+
+	:Output: 
+
+		No variable returned
+		Output includes instruction files and optional log files for data
+
+	:Usage: 
+
+		[example of usage]
+
+	'''
+# SETUP
+	fileinfo = {
+		'SLIT': 'SLIT_N',
+		'DISPERSER': 'GRATNG_N',
+		'DATE-OBS': 'DATE-OBS',
+		'OBSERVER': 'OBSERVER',
+		'OBJECT': 'OBJECT',
+		'RA': 'RA',
+		'DEC': 'DEC',
+		'HA': 'HA',
+		'AIRMASS': 'AIRMASS',
+		'EXPTIME': 'EXPTIME',
+	}
+	for x in 'ABCDEFGH': fileinfo['ARCLAMP{}'.format(x)] = 'LAMPSTA{}'.format(x)
+	for x in '12345': fileinfo['FLATLAMP{}'.format(x)] = 'LAMPSTA{}'.format(x)
+
+# check files and paths
+	if os.path.exists(folder)==False: raise ValueError('Cannot find data folder {}'.format(folder))
+	if verbose==True: print('Processing data files in {}'.format(folder))
+	if outfolder=='': outfolder=folder+'/../reduction/'
+	if os.path.exists(outfolder)==False: 
+		try: os.mkdir(outfolder)
+		except: raise ValueError('Cannot create reduction folder {}'.format(folder))
+	defaults = {'RED': {
+		'prefix': red_prefix,
+		'outfile': red_file,
+		'center': red_center,
+		'lamps': 'He,Ne,Ar,Hg',
+	},
+		'BLUE': {
+		'prefix': blue_prefix,
+		'outfile': blue_file,
+		'center': blue_center,
+		'lamps': 'He,Hg,Cd',
+	}}
+#	 print(date)
+
+# cycle through both modes
+	for mode in ['RED','BLUE']:
+		dfiles = glob.glob(folder+'/{}*.fits'.format(defaults[mode]['prefix']))
+# grab fits files and begin constructing header info
+		if len(dfiles)==0: dfiles = glob.glob(folder+'/*.gz')
+		if len(dfiles)==0: raise ValueError('Cannot find and fits or gz files in folder {}'.format(folder))
+# read in relevant header info
+		dp = pandas.DataFrame()
+		dp['File'] = [d.split('/')[-1] for d in dfiles]
+		dp['Filenumber'] = [int((d.split('.')[0]).replace(defaults[mode]['prefix'],'')) for d in dp['File']]
+		dp.sort_values('Filenumber',inplace=True)
+		dp.reset_index(inplace=True)
+		for k in list(fileinfo.keys()): dp[k] = ['']*len(dp)
+		for i,d in enumerate(dp['File']):
+			hdu = fits.open(folder+d)
+			hdu.verify('silentfix')
+			h = hdu[0].header
+			hdu.close()
+			for k in list(fileinfo.keys()): dp[k].iloc[i] = h[fileinfo[k]]
+		dp['OBJECT'] = [x.replace(' ','') for x in dp['OBJECT']]
+		dp['Obstype'] = ['Science']*len(dp)
+		dp['Coordinate'] = [properCoordinates(dp['RA'].iloc[i]+' '+dp['DEC'].iloc[i]) for i in range(len(dp))]
+		date = str(dp['DATE-OBS'].iloc[0])[:10]
+
+# establish which ones are arc lamps => arc lamps on
+		dp['select'] = ['']*len(dp)
+		for x in 'ABCDEFGH': dp['select'] = dp['select'].str.cat(dp['ARCLAMP{}'.format(x)])
+		dp['select'] = ['on' in x for x in dp['select']]
+		dp.loc[dp['select']==True,'Obstype'] = 'Arc'
+# establish which ones are flat lamps => flat lamps on
+		dp['select'] = ['']*len(dp)
+		for x in '12345': dp['select'] = dp['select'].str.cat(dp['FLATLAMP{}'.format(x)])
+		dp['select'] = ['on' in x for x in dp['select']]
+		dp.loc[dp['select']==True,'Obstype'] = 'Flat'
+# establish which ones are biases => exposure = 0
+		dp['select'] = dp['EXPTIME']==0
+		dp.loc[dp['select']==True,'Obstype'] = 'Bias'
+
+# identify telluric sources based on just on leading HD (faulty)		
+		dp['select'] = [x[:2].upper()=='HD' for x in dp['OBJECT']]
+		dp.loc[dp['select']==True,'Obstype'] = 'Telluric'
+# identify unique sources from object names (exclude Arc, Flat, Bias)
+		dps = dp[dp['Obstype']=='Science']
+		names = list(set(list(dps['OBJECT'])))
+		names.sort()
+# identify fluxcal if present based on proximity to established flux cals
+		for n in names:
+			dps = dp[dp['OBJECT']==n]
+			for k in list(FLUXCALS.keys()):
+				if (dps['Coordinate'].iloc[0]).separation(properCoordinates(FLUXCALS[k]['DESIGNATION'])).to(u.arcsec).value < 30: 
+					dp.loc[dp['OBJECT']==n,'Obstype'] = 'Fluxcal'
+					dp.loc[dp['OBJECT']==n,'OBJECT'] = k
+		if len(dp[dp['Obstype']=='Fluxcal'])==0 and verbose==True: print('Warning: no flux calibrator identified')
+
+# assign telluric based on proximity
+		dp['Telluric'] = ['']*len(dp)
+		dps = dp[dp['Obstype']=='Science']
+		names = list(set(list(dps['OBJECT'])))
+		names.sort()
+		dps = dp[dp['Obstype']=='Telluric']
+		tellurics = list(set(list(dps['OBJECT'])))
+		for n in names:
+			dpn = dp[dp['OBJECT']==n]
+			sep = []
+			for t in tellurics:
+				dpt = dp[dp['OBJECT']==t]
+				sep.append((dpn['Coordinate'].iloc[0]).separation(dpt['Coordinate'].iloc[0]).to(u.arcsec).value)
+			dp.loc[dp['OBJECT']==n,'Telluric'] = tellurics[numpy.argmin(sep)]
+
+# populate file
+		f = open(outfolder+defaults[mode]['outfile'],'w')
+		if comment=='': comment = 'Kast Observations on {}'.format(date)
+		f.write('# {}\n'.format(comment))
+		f.write('MODE\t{}\n'.format(mode))
+		f.write('DATE\t{}\n'.format(date.replace('-','')))
+		f.write('DATA_FOLDER\t{}\n'.format(folder))
+		f.write('REDUCTION_FOLDER\t{}\n'.format(outfolder))
+		dps = dp[dp['Obstype']=='Arc']
+		f.write('ARC_SHALLOW\tFILES={}\tLAMPS={}\n'.format(dps['Filenumber'].iloc[0],defaults[mode]['lamps']))
+		f.write('ARC_DEEP\tFILES={}\tLAMPS={}\n'.format(dps['Filenumber'].iloc[-1],defaults[mode]['lamps']))
+		dps = dp[dp['Obstype']=='Flat']
+		f.write('FLAT\tFILES={:.0f}-{:.0f}\n'.format(numpy.nanmin(dps['Filenumber']),numpy.nanmax(dps['Filenumber'])))
+		dps = dp[dp['Obstype']=='Bias']
+		f.write('BIAS\tFILES={:.0f}-{:.0f}\n'.format(numpy.nanmin(dps['Filenumber']),numpy.nanmax(dps['Filenumber'])))
+		dps = dp[dp['Obstype']=='Fluxcal']
+		if len(dps)>0: 
+			st = 'FLUXCAL\tNAME={}'.format(dps['OBJECT'].iloc[0])
+			st = st+'\tFILES={:.0f}-{:.0f}'.format(numpy.nanmin(dps['Filenumber']),numpy.nanmax(dps['Filenumber']))
+			st = st+'\tCENTER={:.0f}'.format(defaults[mode]['center'])
+			st = st+'\tWINDOW=15\tBACK=25,45\tMETHOD=BOXCAR'
+			f.write(st+'\n')
+		dps = dp[dp['Obstype']=='Science']
+		names = list(set(list(dps['OBJECT'])))
+		names.sort()
+		for n in names:
+			dpss = dps[dps['OBJECT']==n]
+			st = 'SOURCE\tNAME={}'.format(n)
+			st = st+'\tFILES={:.0f}-{:.0f}'.format(numpy.nanmin(dpss['Filenumber']),numpy.nanmax(dpss['Filenumber']))
+			st = st+'\tCENTER={:.0f}'.format(defaults[mode]['center'])
+			st = st+'\tWINDOW=10\tBACK=20,40\tMETHOD=BOXCAR'
+			if dps['Telluric'].iloc[0]!='': st = st+'\tTELLURIC={}'.format(dpss['Telluric'].iloc[0])
+			f.write(st+'\n')
+		dps = dp[dp['Obstype']=='Telluric']
+		names = list(set(list(dps['OBJECT'])))
+		names.sort()
+		for n in names:
+			dpss = dps[dps['OBJECT']==n]
+			st = 'TELLURIC\tNAME={}'.format(n)
+			st = st+'\tFILES={:.0f}-{:.0f}'.format(numpy.nanmin(dpss['Filenumber']),numpy.nanmax(dpss['Filenumber']))
+			st = st+'\tCENTER={:.0f}'.format(defaults[mode]['center'])
+			st = st+'\tWINDOW=15\tBACK=25,45\tMETHOD=BOXCAR\tSPT=G2V'
+			f.write(st+'\n')
+		f.close()
+		if verbose==True: print('Saved instruction file for {} data saved to {}; be sure to double check this!'.format(mode,outfolder+defaults[mode]['outfile']))
+		
+# save dataframe as log file if desired
+		if savelog==True:
+			dpo = dp[['File','OBJECT','Obstype','DATE-OBS','EXPTIME','RA','DEC','HA','AIRMASS','DISPERSER','Telluric']]
+			dpo.to_csv(outfolder+'log_{}_{}.csv'.format(date,mode),index=False)
+			if verbose==True: print('Log file for {} data saved to {}'.format(mode,outfolder+'log_{}.csv'.format(date,mode)))
+	return
 
 
 def readInstructions(file,comment='#',verbose=ERROR_CHECKING):
@@ -3328,7 +3611,7 @@ def fluxCalibrate(fluxsp,name,fit_order=5,fit_cycle=10,sclip=3.,fit_range=[],fit
 	return cal_flux
 
 
-def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,fit_scale='linear',sclip=3.,smooth=5,snlimit=30,fit_range=[],calfolder=TELLSTDFOLDER,stdfile='',plot_file='',verbose=ERROR_CHECKING):
+def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,fit_scale='linear',corrfunc='interpolate',sclip=3.,smooth=5,snlimit=30,fit_range=[],calfolder=TELLSTDFOLDER,stdfile='',plot_file='',verbose=ERROR_CHECKING):
 	'''
 	Uses spectrum of telluric calibrator to determine a second-order flux calibration correction
 	Input: telluric cal spectrum, spt
@@ -3381,11 +3664,20 @@ def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,fit_scale='linear',sclip
 		return cal_reflux
 	fcal = readSpectrum(stdfile,flux_unit=tellsp.flux.unit,wave_unit=tellsp.wave.unit)
 
+	print(len(tellsp.wave),len(fcal.wave),numpy.nanmin(tellsp.wave.value),numpy.nanmax(tellsp.wave.value))
+	print(len(fcal.wave),numpy.nanmin(fcal.wave.value),numpy.nanmax(fcal.wave.value))
+
 # compute, normalize, and smooth ratio of observed telluric to calibrator telluric
 	ratio = tellsp/fcal
+
+	print(len(ratio.wave),numpy.nanmin(ratio.wave.value),numpy.nanmax(ratio.wave.value))
+
 	calscalefactor = numpy.nanmedian(ratio.flux.value)
 	ratio.scale(1./calscalefactor)
 	ratio.smooth(smooth)
+
+	print(len(ratio.wave),numpy.nanmin(ratio.wave.value),numpy.nanmax(ratio.wave.value))
+
 
 # force ends
 #	ratio[:50] = numpy.nanmedian(ratio[50:150])
@@ -3401,7 +3693,7 @@ def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,fit_scale='linear',sclip
 
 # define mask
 	mask[numpy.isnan(flx)==True] = 1
-	mask[ratio.flux.value<=0.4] = 1
+	mask[ratio.flux.value<=0.3] = 1
 	mask[ratio.flux.value>=1.6] = 1
 	mask[numpy.isfinite(ratio.flux.value)==False] = 1
 	mask[numpy.isfinite(tellsp.flux.value/tellsp.unc.value)==False] = 1
@@ -3418,9 +3710,12 @@ def fluxReCalibrate(tellsp,spt,fit_order=4,fit_cycle=10,fit_scale='linear',sclip
 		diff = ratio.flux.value-(1./numpy.polyval(p,ratio.wave.value))
 		mask[numpy.absolute(diff)>(sclip*numpy.nanstd(diff[mask==0]))] = 1
 
-# generate interpolated correction function defaulting to 1
-	f = interp1d(ratio.wave.value[mask==0],ratio.flux.value[mask==0],bounds_error=False,fill_value=1.)
-	correction = 1./f(wv)
+
+# generate polynomial or interpolated correction function
+	if corrfunc=='polynomial': correction = numpy.polyval(p,wv)
+	else: 
+		f = interp1d(ratio.wave.value[mask==0],ratio.flux.value[mask==0],bounds_error=False,fill_value='extrapolate')
+		correction = 1./f(wv)
 
 # generate reporting structure	
 	cal_reflux['COEFF'] = p
@@ -5503,8 +5798,9 @@ def theWorks(sp,measure_classification=True,classification_plot='',classificatio
 		if verbose==True: print('\nIndices:')
 		for iset in index_sets:
 			inds[iset] = measureIndexSet(sp,iset)
-			if verbose==True: print('\t{}'.format(iset))
-			for k in list(inds[iset].keys()): print('\t\t{}: {:.3f}+/-{:.3f}'.format(k,inds[iset][k][0],inds[iset][k][1]))
+			if verbose==True: 
+				print('\t{}'.format(iset))
+				for k in list(inds[iset].keys()): print('\t\t{}: {:.3f}+/-{:.3f}'.format(k,inds[iset][k][0],inds[iset][k][1]))
 		output['indices'] = inds
 
 # index-based classifications
