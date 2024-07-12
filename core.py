@@ -72,7 +72,7 @@ print('Please report any errors are feature requests to our github page, {}\n\n'
 # RESOURCE DATA
 ############################################################
 
-FLUXCALFOLDER = CODE_PATH+'/../resources/flux_standards/'
+FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
 FLUXCALS = {
 	'HILTNER600': {'FILE' : 'fhilt600.dat','DESIGNATION': 'J06451337+0208146'},
 	'FEIGE34': {'FILE' : 'ffeige34.dat','DESIGNATION': 'J10393674+4306092'},
@@ -85,7 +85,7 @@ FLUXCALS = {
 	'HR7596': {'FILE' : 'fhr7596.dat','DESIGNATION': 'J19544479+0016248'},
 }
 
-SPTSTDFOLDER = CODE_PATH+'/../resources/spectral_standards/'
+SPTSTDFOLDER = CODE_PATH+'/resources/spectral_standards/'
 SPTSTDS = {}
 PLOT_DEFAULTS = {'figsize': [6,4], 'fontsize': 16,
 'color': 'k', 'ls': '-', 'alpha': 1, 
@@ -95,9 +95,9 @@ PLOT_DEFAULTS = {'figsize': [6,4], 'fontsize': 16,
 'zero_color': 'k', 'zero_ls': '--', 'zero_alpha': 1,
 }
 
-TELLSTDFOLDER = CODE_PATH+'/../resources/telluric_standards/'
+TELLSTDFOLDER = CODE_PATH+'/resources/telluric_standards/'
 
-SAMPLEFOLDER = CODE_PATH+'/../resources/sample_spectra/'
+SAMPLEFOLDER = CODE_PATH+'/resources/sample_spectra/'
 
 ERROR_CHECKING = False
 
