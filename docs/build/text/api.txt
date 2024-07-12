@@ -1,0 +1,709 @@
+API
+***
+
+
+Spectrum Class
+==============
+
+class kastredux.core.Spectrum(**kwargs)
+
+   Container for spectrum object Includes wavelength, flux, variance,
+   background, mask vectors; trace; and header Includes methods for
+   combining spectrum objects together, reading/writing, conversion
+
+   applyFluxCal(cal_flux)
+
+      Apply flux calibration
+
+   applyTelluricCal(cal_tell)
+
+      Apply telluric correction
+
+   applyWaveCal(cal_wave)
+
+      Apply wavelength calibration
+
+   clean()
+
+      Purpose:
+         Cleans up spectrum elements to make sure they are properly
+         configured
+
+   convertFlux(funit)
+
+      Convert the flux to a new unit
+
+   convertWave(wunit)
+
+      Convert the wavelength to a new unit
+
+   normalize(rng=[])
+
+      Scale spectrum by a float value
+
+   plot(**kwargs)
+
+      Plot the spectrum
+
+   reset()
+
+      Purpose:
+         Reset a spectrum to its original read-in state
+
+   scale(fact)
+
+      Scale spectrum by a float value
+
+   setbase()
+
+      Purpose:
+         Sets the current state of spectrum as default, eliminates
+         prior original
+
+   smooth(scale, method='median')
+
+      Do a boxcar smooth
+
+   toFile(file, clobber=True, csv=False, delimiter='\t', save_header=True, save_noise=False, save_background=False, save_mask=False, comment='#', **kwargs)
+
+      Exports a spectrum to a file
+
+
+Routines
+========
+
+
+Imaging data reduction
+----------------------
+
+kastredux.core.readInstructions(file, comment='#', verbose=True)
+
+   Purpose:
+      Reads in an reduction instruction file and place parameters into
+      a dictionary
+
+   Required Inputs:
+      param file:
+         full path filename to instruction file, which is a set of
+         tab-separated key and value pairs
+
+   Optional Inputs:
+      param comment='#':
+         character(s) prefixing a line that is a comment
+
+   Output:
+      Dictionary containing input parameters
+
+   Usage:
+      The instruction file should have the format as follows:
+
+         # A comment MODE    RED DATE    20190918 DATA_FOLDER
+         /Users/adam/data/kast/190918/data/ REDUCTION_FOLDER
+         /Users/adam/data/kast/190918/reduction/ BIAS
+         FILES=2003-2032 FLAT    FILES=2037-2066 ARC_SHALLOW
+         FILES=2000      LAMPS=AR,HG,NE ARC_DEEP        FILES=2001
+         LAMPS=AR,HG,NE SOURCE  NAME=J1833+2225 FILES=2068-2069
+         TELLURIC=HD177082 TELLURIC        NAME=HD177082
+         FILES=2070-2071 SPT=G2V FLUXCAL NAME=FIEGE110   FILES=2080
+         TELLURIC=HD219833 TELLURIC        NAME=HD219833   FILES=2082
+         SPT=G2V OBSERVERS       Roman, Christian, Adam
+
+      The required keywords are
+      'DATA_FOLDER','MODE','BIAS','FLAT','ARC_SHALLOW','ARC_DEEP', and
+      'EXPORT' Note that sources and tellurics are matched through
+      their name fields
+
+      [example of usage]
+
+kastredux.core.makeBias(files, method='median', folder='./', mode='RED', verbose=True, output='')
+
+   Purpose:
+      Creates a bias frame by median combining bias frame files
+
+   Required Inputs:
+      param files:
+         file numbers to combine, as either string sequence or 1D
+         array
+
+   Optional Inputs:
+      param method='median':
+         method for combining files; see >>``<<combineImages()''
+
+      param folder='./':
+         data folder containing data
+
+      param mode='RED':
+         data mode (RED or BLUE)
+
+   Output:
+      2D image array file for bias frame and header file from first
+      image
+
+   Usage:
+      Note: currently this is only a pass through to
+      >>``<<combineImages()''; could include additional checks
+
+kastredux.core.makeFlat(files, bias, method='median', quantile=0.9, folder='./', mode='RED', verbose=True, output='')
+
+   Purpose:
+      Creates a bias frame by median combining bias frame files
+
+   Required Inputs:
+      param files:
+         file numbers to combine, as either string sequence or 1D
+         array
+
+      param bias:
+         2D bias image
+
+   Optional Inputs:
+      param method='median':
+         method for combining files; see >>``<<combineImages()''
+
+      param quantile=0.9:
+         quantile to use for normalizing flat
+
+      param folder='./':
+         data folder containing data
+
+      param mode='RED':
+         data mode (RED or BLUE)
+
+   Output:
+      2D image array file for flat field frame and header from first
+      file
+
+   Usage:
+      TBD
+
+kastredux.core.makeMask(bias, flat, sclip=3.0, verbose=True, output='')
+
+   Creates a mask file: 0 = OK, 1 = BAD Input: flat, bias Output: mask
+   image
+
+kastredux.core.reduceScienceImage(image, bias, flat, mask=[], exposure='EXPTIME', gain=0.55, rn=4.3, mask_image=True, folder='./', mode='RED', verbose=True)
+
+   Purpose:
+      Performs image reduction steps on a science image: bias
+      subtraction, flat fielding, masking bad pixels, and conversion
+      to e-/s; and computes variance image
+
+   Required Inputs:
+      param images:
+         either full filename or file number of the science frame
+
+      param bias:
+         2D bias image
+
+      param flat:
+         2D flat image
+
+   Optional Inputs:
+      param mask=None:
+         set to a 2D mask image if masking is desired
+
+      param mask_image=True:
+         set to True to mask clean a science image
+
+      param exposure='EXPTIME':
+         either the header keyword for exposure time or exposure in
+         seconds
+
+      param gain=CCD_PARAMETERS['GAIN']:
+         either the header keyword for gain (DN/e-) or the gain value
+
+      param gain=CCD_PARAMETERS['RN']:
+         either the header keyword for read noise (in e-) or the read
+         noise value
+
+      param folder='./':
+         data folder containing data
+
+      param mode='RED':
+         data mode (RED or BLUE)
+
+   Output:
+      2D image array file for flat field frame
+
+   Usage:
+      TBD
+
+
+Spectral data reduction
+-----------------------
+
+kastredux.core.findPeak(im, rng=[], cntr=-1, window=50, trace_slice=[], method='maximum', verbose=True, plot_file='')
+
+   Finds a source spatial peak in a median combined spectral stack of
+   an image
+
+kastredux.core.traceDispersion(im, cntr=-1, window=5, step_size=5, trace_slice=[], fitorder=3, fitcycle=5, sigclip=3, method='maximum', verbose=True, plot_file='')
+
+   Traces dispersion
+
+kastredux.core.extract2D(im, trace, start=0, window=5, plot_file='')
+
+   extracts a 2D spectrum centered on trace or central column THIS
+   FUNCTION HAS BEEN SUPERSEDED BY RECTIFY
+
+kastredux.core.spatialProfile(im, cntr=-1, window=10, verbose=True, plot_file='')
+
+   generates spatial profile for optimal extraction NOTE: assumes it
+   is provided a rectified image
+
+kastredux.core.extractSpectrum(im, var=[], mask=[], method='optimal', cntr=-1, profile=[], src_wnd=5, bck_wnd=[10, 20], subtract_background=True, verbose=True, plot_file='', center_kwargs={}, **kwargs)
+
+   Purpose:
+      Extracts spectrum from science image; can be done with pre-
+      determined trace, and with various options for extraction
+      depending on use
+
+   Required Inputs:
+      image:
+
+   Optional Inputs:
+      variance = []: variance image method = 'optimal': mask = []:
+      spatial_rng = []: start = 0: cntr = None: src_wnd = 5: bck_wnd =
+      [10,20]: trace = []: trace_slice = []: shift_trace = False:
+      profile = []: plot_file = '':
+
+   Output: spectrum object of each source, which includes flux,
+   variance, background
+
+kastredux.core.waveCalibrateArcs(arcim, deep=[], dispersion='', trace=[], prior={}, fitorder=4, verbose=True, middle=True, resolution=0.0, lam0=0.0, cntr=0.0, fitcycle=5, sclip=2.0, plot_file='')
+
+   Wavelength calibration from arc lamp Input: arc, list of lines
+   Output: dictionary containing pixel->wave conversion, fit
+   diagnostics THIS ASSUMES RED ONLY NEED TO INCLUDE HELIOCENTRIC
+   CORRECTION EXPLICITLY
+
+kastredux.core.fluxCalibrate(fluxsp, name, fitorder=5, fitcycle=10, sclip=3.0, fluxcalfolder='/Users/adam/python_codes/kastredux//kastredux/resources/flux_standards/', calwaveunit=Unit("Angstrom"), calfluxunit=Unit("erg / (Angstrom cm2 s)"), plot_file='', verbose=True)
+
+   Uses spectrum of flux calibrator to determine the flux calibration
+   correction Input: flux cal spectrum, flux cal name Output:
+   dictionary containing  observed to physical flux correction, fit
+   diagnostics
+
+kastredux.core.telluricCalibrate(tellsp, fitrange=[6200, 8800], fitorder=5, fitcycle=10, sclip=3.0, plot_file='', verbose=True)
+
+   Uses spectrum of telluric calibrator to determine corrections to
+   telluric absorption Input: telluric cal spectrum, spectral type
+   Output: dictionary containing telluric absorption correction, fit
+   diagnostics
+
+kastredux.core.profileCheck(instructions='', cntr=335, verbose=True, trace_slice=[250, 1250], **kwargs)
+
+   Examines profiles from instruction file to prep the extraction axes
+
+kastredux.core.reduce(redux={}, parameters={}, instructions='input.txt', bias_file='', flat_file='', mask_file='', cal_wave_file='', cal_flux_file='', reset=False, verbose=True, src_wnd=5, bck_wnd=[15, 20], **kwargs)
+
+
+Imaging data manipulation
+-------------------------
+
+kastredux.core.makeLog(folder, output='', verbose=True)
+
+   Purpose:
+      Reads in the headers of files in a data folder and generates a
+      log in pandas format
+
+   Required Inputs:
+      param folder:
+         folder for data
+
+   Optional Inputs:
+      param output='':
+         output file for log; can be .xlsx, .xls, .txt, .csv, .htm,
+         .html, or .tex
+
+      param mode='RED':
+         data mode (RED or BLUE)
+
+   Output:
+      If one file number provided, a 2D numpy array containing image
+      and dictionary containing header If more than one file number
+      provided, a 3D numpy array of [n files x n rows x n columns] and
+      array of header dictionaries
+
+   Usage:
+      TBD
+
+kastredux.core.readKastFiles(num, folder='./', mode='RED', verbose=True)
+
+   Purpose:
+      Reads in a KAST fits file(s) and returns 2D image & header
+
+   Required Inputs:
+      param num:
+         file number
+
+   Optional Inputs:
+      param folder='./':
+         data folder containing data
+
+      param mode='RED':
+         data mode (RED or BLUE)
+
+   Output:
+      If one file number provided, a 2D numpy array containing image
+      and dictionary containing header If more than one file number
+      provided, a 3D numpy array of [n files x n rows x n columns] and
+      array of header dictionaries
+
+   Usage:
+      TBD
+
+kastredux.core.combineImages(imarr, method='median', axis=0, sclip=5.0, verbose=True, **kwargs)
+
+   Purpose:
+      Takes an array of 2D images and combines them with a give
+      statistic
+
+   Required Inputs:
+      param imarr:
+         by default, a 3D array of N images, where N is length of
+         >>``<<axis'';
+
+      alternately this can be a string specifying the file numbers or
+      1D array of file numbers, with images read in using
+      readKastFiles()
+
+   Optional Inputs:
+      param method='median':
+         method for combining images (more than one of these can be
+         included) * 'median': median combine * 'add': add all pixels
+         * 'average: average value of all pixels * 'sigclip': sigma
+         clipping, rejecting outliers N x std deviation, where N is
+         specified by input >>``<<sclip''
+
+      param axis=0.:
+         axis upon which images are combined
+
+      param sclip=5.:
+         number of standard deviations to apply signma clipping
+
+      If reading in files, additional parameters for readKastFiles()
+      can be included though >>**<<kwargs
+
+   Output:
+      Combined 2D image
+
+   Usage:
+      TBD
+
+kastredux.core.crRejectCombine(ims, sclip=1.0, nfitcycle=5, rejlimit=0.01, scliplimit=10.0, smooth=False, smooth_scale=3, verbose=True)
+
+kastredux.core.maskClean(image, mask, replace=0.0, verbose=True)
+
+   Purpose:
+      Applies a mask to clean an image
+
+   Required Inputs:
+      param image:
+         2D array
+
+      param mask:
+         2D array where 0 = good and 1 = mask
+
+   Optional Inputs:
+      param replace=0.:
+         replace bad pixels with this value
+
+   Output:
+      Cleaned 2D image
+
+   Usage:
+      TBD
+
+kastredux.core.crRejectCombine(ims, sclip=1.0, nfitcycle=5, rejlimit=0.01, scliplimit=10.0, smooth=False, smooth_scale=3, verbose=True)
+
+
+Spectrum manipulation
+---------------------
+
+kastredux.core.readSpectrum(filename, file_type='', delimiter='\\s+', comment='#', columns=['wave', 'flux', 'unc', 'background', 'mask'], wave_unit=Unit("Angstrom"), flux_unit=Unit("erg / (Angstrom cm2 s)"), verbose=True, **kwargs)
+
+   Purpose:
+      Reads in a file and puts into a Spectrum structure
+
+   Required Inputs:
+      param file:
+         full path to data file
+
+   Optional Inputs:
+      param file_type='':
+         preset for delimiter for ascii files * 'tab' = tab-delimited
+         * 'csv' = comma-delimited * 'semicsv' = semi-colon delimited
+         * 'ascii' = text with specified delimiter * 'excel' = excel
+         spreadsheet * 'fit' or 'fits' = fits file
+
+      param delimiter='s+':
+         delimiter for ascii file (by default this is "white space")
+
+      param comment='#':
+         character(s) prefixing a comment line
+
+      param columns=['wave','flux','unc','background','mask']:
+         if not specified by a header, this is the assumed column
+         order
+
+      param wave_unit=DEFAULT_WAVE_UNIT:
+         default unit for wavelength
+
+      param flux_unit=DEFAULT_FLUX_UNIT:
+         default unit for flux, uncertainty and background
+
+      Additional parameters for setting properties in Spectrum object
+      can be passed through >>**<<kwargs
+
+   Output:
+      Spectrum object
+
+   Usage:
+      TBD
+
+kastredux.core.compareSpectra(sp1, sp2orig, fit_range=[], fitcycle=5, sclip=3.0, plot=False, plot_file='', verbose=True, **kwargs)
+
+   Compares to spectra to each other and returns the best fit
+   statistic and scale factor Input: spectra objects Output: fit stat
+   and scale factor
+
+
+Other helper functions
+----------------------
+
+kastredux.core.checkDict(ref, refdict, altref='altname', replace=[], verbose=True)
+
+   Purpose:
+      General usage program to check if a key is present in a
+      dictionary, with the option to look through alternate names
+
+   Required Inputs:
+      param ref:
+         A string containing the reference for lumiosity/SpT relation,
+         should be among the keys and alternate names in refdict
+
+      param refdict:
+         dictionary containing empirical relation information
+
+   Optional Inputs:
+      None
+
+   Output:
+      A string containing SPLAT's default name for a given reference
+      set, or False if that reference is not present
+
+   Example:
+
+   >>> import splat
+   >>> print(splat.checkEmpiricalRelation('filippazzo',splat.SPT_LBOL_RELATIONS))
+           filippazzo2015
+   >>> print(splat.checkEmpiricalRelation('burgasser',splat.SPT_BC_RELATIONS))
+           False
+
+kastredux.core.isUnit(s)
+
+   Purpose:
+      Check if a quantity is an astropy unitted quantity
+
+   Required Input:
+      param s:
+         quantity to be evaluated
+
+   Optional Input:
+      None
+
+   Output:
+      True if quantity is unitted, False otherwise
+
+   Usage:
+      TBD
+
+kastredux.core.isNumber(s)
+
+   Purpose:
+      Check if a quantity is a number or can be converted into a
+      number
+
+   Required Input:
+      param s:
+         quantity to be evaluated
+
+   Optional Input:
+      None
+
+   Output:
+      True if quantity is a number, False otherwise
+
+   Usage:
+      TBD
+
+kastredux.core.numberList(numstr, sort=False)
+
+   Purpose:
+      Convert a string listing of numbers into an array of numbers
+
+   Required Input:
+      param numstr:
+         string indicating number list, e.g., '45,50-67,69,72-90'
+
+   Optional Input:
+      param sort:
+         set to True to sort output list (default = False)
+
+   Output:
+      list of integers specified by string
+
+   Usage:
+      >>> import kastredux
+      >>> a = kastredux.numberList('45,50-67,69,72-90')
+      >>> print(a)
+              [45, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 69,
+              72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90]
+
+kastredux.core.typeToNum(input, prefix='', suffix='', verbose=True)
+
+   Purpose:
+      Converts between string and numeric spectral types, with the
+      option of specifying the class prefix/suffix and uncertainty
+      tags
+
+   Required inputs:
+      param inp:
+         Spectral type to convert. Can convert a number or a string
+         from 0.0 (K0) and 49.0 (Y9).
+
+   Optional inputs:
+      param:
+         error = '': flag to indicate magnitude of classification
+         uncertainty; by default ':' for uncertainty > 1 subtypes and
+         '::' for uncertainty > 2 subtype added as suffix to string
+         output. Can also use *err*.
+
+      param:
+         uncertainty = 0: numerical uncertainty of classification; can
+         also use *unc*
+
+      param:
+         subclass = 'dwarf': spectral class; options include:
+
+         * *field* or *fld* or *alpha*: object is a field dwarf - no
+           prefix/suffix to string output
+
+         * *sd* or *subdwarf*: object is a subdwarf - 'sd' prefix to
+           string output
+
+         * *dsd* or *d/sd*: object is an intermediate subdwarf -
+           'd/sd' prefix to string output
+
+         * *esd*: object is an extreme subdwarf - 'esd' prefix to
+           string output
+
+         * *usd*: object is an ultra subdwarf - 'usd' prefix to
+           string output
+
+         * *delta*: object is a extremely low surface gravity dwarf
+           (~1 Myr) - 'delta' suffix to string output
+
+         * *vlg* or *gamma* or *lowg*: object is a low surface
+           gravity dwarf (~10 Myr) - 'gamma' suffix to string output
+
+         * *intg* or *beta*: object is an intermediate surface
+           gravity dwarf (~100 Myr) - 'beta' suffix to string output
+
+         * *giant*: object is a giant with luminosity class III
+           suffix added to string output
+
+         * *subgiant*: object is a subgiant with luminosity class IV
+           suffix added to string output
+
+         * *supergiant*: object is a supergiant with luminosity
+           class I suffix added to string output
+
+      param:
+         metallicity_class = '': metallicity class of object,
+         traditionally represented by 'sd','d/sd','esd','usd', and
+         added on as prefix to string output. Can also use *lumclass*
+
+      param:
+         luminosity_class = '': luminosity class of object
+         traditionally represented by roman numerals (e.g., 'III') and
+         added on as suffix to string output. Can also use *lumclass*
+
+      param:
+         age_class = '': age class of object, traditionally one of
+         'alpha', 'beta', 'gamma', 'delta' and added on as suffix to
+         string output (see subclass). Can also use 'ageclass'
+
+      param:
+         color_class: color class of object, traditionally 'b' (for
+         blue) or 'r' (for red), added as prefix to string output. Can
+         also use 'colorclass'
+
+      param:
+         peculiar = False: Set to True if object is peculiar, which
+         adds a 'pec' suffix to string output
+
+      param:
+         verbose = False: Set to True to provide more feedback
+
+   Outputs:
+      The number or string of a spectral type
+
+   Example:
+      >>> import splat
+      >>> print splat.typeToNum(30)
+              T0.0
+      >>> print splat.typeToNum('T0.0')
+              30.0
+      >>> print splat.typeToNum(27, peculiar = True, uncertainty = 1.2, lumclass = 'II')
+              L7.0IIp:
+      >>> print splat.typeToNum(50)
+              Spectral type number must be between 0 (K0) and 49.0 (Y9)
+              nan
+
+*Contents*
+
+* KASTREDUX: KAST optical spectral reduction package
+
+  * Installation and Dependencies
+
+  * Acknowledgements
+
+    * KASTREDUX Reduction Instructions
+
+    * API
+
+* KASTREDUX Reduction Instructions
+
+  * Overview of reduction procedures
+
+  * Downloading and organizing your data
+
+  * Preparing the input script
+
+    * Commands for Data Organization and Calibration
+
+    * Commands for Spectral Reduction
+
+    * Additional Extraction Keywords
+
+    * Additional Commands
+
+    * Providing inputs through the program call
+
+  * Calling the program reduce()
+
+  * Outputs
+
+    * KASTREDUX: KAST optical spectral reduction package
+
+    * API
+
+*Search*
+
+* Index
+
+* Module Index
+
+* Search Page

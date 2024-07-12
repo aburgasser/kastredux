@@ -1,0 +1,14 @@
+# Include the license file
+include LICENSE
+
+# Include the documentation
+recursive-include docs/build/html/ *
+
+# Include the training materials
+recursive-include training/ *
+
+# Include the data files
+recursive-include resources/flux_standards/ *.dat
+recursive-include resources/sample_spectra/ *.fits *.txt
+recursive-include resources/spectral_standards/ *.txt
+recursive-include resources/telluric_standards/ *.txt
