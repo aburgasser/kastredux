@@ -1,7 +1,7 @@
 # kastredux
  Specialized Lick/KAST optical spectral reduction package
 
-## INSTALLATION NOTES
+## Installation
 
 `kastredux` can be installed from pip:
 
@@ -33,10 +33,10 @@ It is recommended that you install in a conda environment to ensure the dependen
 ### Flux standards
 
 The code includes spectrophotometric flux standards from 
-[Oke (1990)](https://ui.adsabs.harvard.edu/abs/1990AJ.....99.1621O)
+[Oke (1990)](https://ui.adsabs.harvard.edu/abs/1990AJ.....99.1621O),
 [Hamuy et al. (1992)](https://ui.adsabs.harvard.edu/abs/1992PASP..104..533H) , and
 [Hamuy et al. (1994)](https://ui.adsabs.harvard.edu/abs/1994PASP..106..566H);
-see https://www.eso.org/sci/observing/tools/standards/spectra/okestandards.html and https://www.eso.org/sci/observing/tools/standards/spectra/hamuystandards.html
+see ESO's pages on [Oke standards](https://www.eso.org/sci/observing/tools/standards/spectra/okestandards.html) and [Hamuy standards](https://www.eso.org/sci/observing/tools/standards/spectra/hamuystandards.html).
 
 ### Spectral standards
 
@@ -59,13 +59,13 @@ OBAFGKM standards from the [Pickles (1998) library](https://ui.adsabs.harvard.ed
 
 ### Sample spectra
 
-The code also includes reduced spectra form Kast for the following sources in *.fits format
+The code also includes reduced spectra from Kast for the following sources in `*.fits` format:
 
 * [G 233-42](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=G+233-42&NbIdent=1&Radius=2&Radius.unit=arcmin&submit=submit+id): M5 dwarf, G=14.0
-* [PM J0102+5254](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%409627359&Name=PM%20J01020%2b5254&submit=submit): M3 dwarf G=12.5
-* [LP 555-25](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%404008479&Name=LP%20%20555-25&submit=submit): M6.5 G=15.8
-* [TOI-2084](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%4017843263&Name=TOI-2084&submit=submit): M2 G=14.4, data from [Barkaoui et al. (2003)](https://ui.adsabs.harvard.edu/abs/2023A%26A...677A..38B/abstract)
-* [LP 389-13](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=LP+389-13&NbIdent=1&Radius=2&Radius.unit=arcmin&submit=submit+id): M2 G=11.6, data from [Rothermich et al. (2024)](https://ui.adsabs.harvard.edu/abs/2024AJ....167..253R/abstract).
+* [PM J0102+5254](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%409627359&Name=PM%20J01020%2b5254&submit=submit): M3 dwarf, G=12.5
+* [LP 555-25](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%404008479&Name=LP%20%20555-25&submit=submit): M6.5 dwarf, G=15.8
+* [TOI-2084](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%4017843263&Name=TOI-2084&submit=submit): M2 dwarf, G=14.4, data from [Barkaoui et al. (2003)](https://ui.adsabs.harvard.edu/abs/2023A%26A...677A..38B/abstract)
+* [LP 389-13](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=LP+389-13&NbIdent=1&Radius=2&Radius.unit=arcmin&submit=submit+id): M2 dwarf, G=11.6, data from [Rothermich et al. (2024)](https://ui.adsabs.harvard.edu/abs/2024AJ....167..253R/abstract)
 
 ## Reduction
 
@@ -327,7 +327,7 @@ The function `kr.theWorks(sp)` runs all of these analysis routines together
 
 If you use this code in your research, publications, or presentations, please include the following citation:
 
-	Burgasser (2025). aburgasser/kastredux (vXXX). Zenodo. https://doi.org/10.5281/zenodo.18333308
+	Burgasser (2026). aburgasser/kastredux (vXXX). Zenodo. https://doi.org/10.5281/zenodo.18333308
 
 or in bibtex:
 
