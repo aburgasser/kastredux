@@ -35,7 +35,7 @@ It is recommended that you install in a conda environment to ensure the dependen
 The code includes spectrophotometric flux standards from 
 [Oke (1990)](https://ui.adsabs.harvard.edu/abs/1990AJ.....99.1621O)
 [Hamuy et al. (1992)](https://ui.adsabs.harvard.edu/abs/1992PASP..104..533H) , and
-[Hamuy et al. (1994)](a https://ui.adsabs.harvard.edu/abs/1994PASP..106..566H);
+[Hamuy et al. (1994)](https://ui.adsabs.harvard.edu/abs/1994PASP..106..566H);
 see https://www.eso.org/sci/observing/tools/standards/spectra/okestandards.html and https://www.eso.org/sci/observing/tools/standards/spectra/hamuystandards.html
 
 ### Spectral standards
@@ -101,7 +101,7 @@ The keyword `savelog=True` also generates the CSV files  `log_[date]_RED.csv` an
 
 At this stage, it is helpful to review the instruction files and make edits, including:
 
-* File numbers ('FILES=###-###`), useful if there were initial "test" exposures
+* File numbers (`FILES=###-###`), useful if there were initial "test" exposures
 * Source names (`NAME=`)
 * Flux calibrator (`FLUXCAL`) - note that at least one catalogued flux calibrator must be included
 * Initial guess for the center of the spectral trace (`CENTER=###`) 
@@ -154,13 +154,12 @@ There are also a series of pickle (`*.pkl`) files containing intermediate data p
 It is also possible to conduct reductions step-by-step if more control over the process is desired with the following steps:
 
 1. Set up necessary information
-	
-	# imports
+Start with import statements and the variables needed for your reduction
+
 	import kastredux as kr
 	import numpy as np
 	import os
 
-	# set up files
 	data_folder = "data" # data folder
 	reduction_folder = "reduction" # reduction folder
 	camera = "RED" # reducing red camera data
@@ -175,31 +174,33 @@ It is also possible to conduct reductions step-by-step if more control over the 
 	flxname = "Hiltner600"
 	tellf = 1040 # telluric cal frame number
 	
-2. Generate bias frame
+2. Generate calilbration frames
+First make the bias frame
 
 	files = ["{}{}.fits".format(prefix,int(n)) for n in np.arange(darkf1,darkf2)]
 	bias_out = os.path.join(reduction_folder,"bias{}.fits",format(camera))
 	bias, _ = kr.makeBias(files,folder=data_folder,mode=camera,output=bias_out)
 
-3. Generate flat field frame
+Then make the normalized flat field frame
 
 	files = ["{}{}.fits".format(prefix,int(n)) for n in np.arange(baisf1,biasf2)]
 	flat_out = os.path.join(reduction_folder,"flat{}.fits",format(camera))
 	flat, _ = kr.makeBias(files,bias,folder=data_folder,mode=camera,output=flat_out)
 
-4. Generate mask and clean flat field
+Then make the mask frame from the bias and flatfield
 
 	mask_out = os.path.join(reduction_folder,"mask{}.fits",format(camera))
 	mask = kr.makeMask(bias,flat,mode=camera,output=mask_file)
 	flatc = kr.maskClean(flat,mask,replace=1.)
 
-5. Generate wavelength calibration
+Finally generate the wavelength calibration
 
 	arc,_ = kr.readFiles("{}{}.fits".format(prefix,int(arcf)),folder=data_folder,mode=camera)
 	diagplot = "diagnostic_wavecal.pdf"
 	wavecal = kr.waveCalibrateArcs(arc,,dispersion=grating,mode=camera,middle=True,plot_file=diagplot)
 
-6. Generate flux calibration
+3. Generate flux calibration
+Use your flux calibrator observation to make the flux correction function
 
 	im,hd = kr.readFiles("{}{}.fits".format(prefix,int(flxf)),folder=data_folder,mode=camera)
 	imr,var = kr.reduceScienceImage(im,bias,flat,mask,hd=hd)
@@ -218,7 +219,8 @@ It is also possible to conduct reductions step-by-step if more control over the 
 	diagplot = "diagnostic_fluxcal.pdf"
 	fluxcal = kr.fluxCalibrate(flxsp,flxname,fit_order=fit_order,fit_scale=flux_fit_scale,fit_range=[6000,9000],plot_file=diagplot
 
-7. Generate telluric correction
+4. Generate telluric correction
+Use your G2V telluric star (if obtained) to make the second-order flux correction and telluric correction functions
 
 	im,hd = kr.readFiles("{}{}.fits".format(prefix,int(tellf)),folder=data_folder,mode=camera)
 	imr,var = kr.reduceScienceImage(im,bias,flat,mask,hd=hd)
@@ -240,7 +242,8 @@ It is also possible to conduct reductions step-by-step if more control over the 
 	diagplot = "diagnostic_reflux_tellstd.pdf"
 	tellfluxcorr = kr.fluxReCalibrate(tellsp,spt="G2V",plot_file=diagplot)
 
-8. Extract science spectrum, using trace from telluric standard, and apply flux calibration and telluric correction
+5. Extract science spectrum
+This case uses the trace from the telluric standard, and applies flux calibration and telluric correction
 
 	files = ["{}{}.fits".format(prefix,int(n)) for n in np.arange(scif1,scif2)]
 	ims,_ = kr.readFiles(files,folder=data_folder,mode=camera)
@@ -312,7 +315,7 @@ The `kastredux' analysis routines are defined primarily for late-type stars and 
 * `metallicity(sp,ref='mann2013')`: determines the metallicity from an empirical calibration of the zeta index
 * `chiFactor(sp,ref='schmidt2014')`: computes the chi correction factor, and if desired the relative Halpha to bolometric luminosity using a predefined spectral-type based calibration
 
-The function `kr.theWorks()` runs all of these analysis routines together
+The function `kr.theWorks(sp)` runs all of these analysis routines together
 
 
 ## Citing the code
