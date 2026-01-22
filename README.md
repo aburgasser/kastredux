@@ -33,7 +33,7 @@ It is recommended that you install in a conda environment to ensure the dependen
 ### Flux standards
 
 The code includes spectrophotometric flux standards from 
-[Oke (1990) <a https://ui.adsabs.harvard.edu/abs/1990AJ.....99.1621O>], 
+[Oke (1990)](https://ui.adsabs.harvard.edu/abs/1990AJ.....99.1621O)
 [Hamuy et al. (1992)  <a https://ui.adsabs.harvard.edu/abs/1992PASP..104..533H>] , and
 [Hamuy et al. (1994)  <a https://ui.adsabs.harvard.edu/abs/1994PASP..106..566H>];
 see https://www.eso.org/sci/observing/tools/standards/spectra/okestandards.html and https://www.eso.org/sci/observing/tools/standards/spectra/hamuystandards.html
