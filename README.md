@@ -154,6 +154,7 @@ There are also a series of pickle (`*.pkl`) files containing intermediate data p
 It is also possible to conduct reductions step-by-step if more control over the process is desired with the following steps:
 
 1. Set up necessary information
+
 Start with import statements and the variables needed for your reduction; the *f variables correspond to image frame numbers
 
 	import kastredux as kr
@@ -175,6 +176,7 @@ Start with import statements and the variables needed for your reduction; the *f
 	tellf = 1040
 	
 2. Generate calilbration frames
+
 First make the bias frame
 
 	files = ["{}{}.fits".format(prefix,int(n)) for n in np.arange(darkf1,darkf2)]
@@ -200,6 +202,7 @@ Finally generate the wavelength calibration
 	wavecal = kr.waveCalibrateArcs(arc,,dispersion=grating,mode=camera,middle=True,plot_file=diagplot)
 
 3. Generate flux calibration
+
 Use your flux calibrator observation to make the flux correction function
 
 	im,hd = kr.readFiles("{}{}.fits".format(prefix,int(flxf)),folder=data_folder,mode=camera)
@@ -220,6 +223,7 @@ Use your flux calibrator observation to make the flux correction function
 	fluxcal = kr.fluxCalibrate(flxsp,flxname,fit_order=fit_order,fit_scale=flux_fit_scale,fit_range=[6000,9000],plot_file=diagplot
 
 4. Generate telluric correction
+
 Use your G2V telluric star (if obtained) to make the second-order flux correction and telluric correction functions
 
 	im,hd = kr.readFiles("{}{}.fits".format(prefix,int(tellf)),folder=data_folder,mode=camera)
@@ -243,6 +247,7 @@ Use your G2V telluric star (if obtained) to make the second-order flux correctio
 	tellfluxcorr = kr.fluxReCalibrate(tellsp,spt="G2V",plot_file=diagplot)
 
 5. Extract science spectrum
+
 This case uses the trace from the telluric standard, and applies flux calibration and telluric correction
 
 	files = ["{}{}.fits".format(prefix,int(n)) for n in np.arange(scif1,scif2)]
