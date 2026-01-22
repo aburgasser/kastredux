@@ -310,11 +310,28 @@ The `kastredux' analysis routines are defined primarily for late-type stars and 
 
 The function `kr.theWorks()` runs all of these analysis routines together
 
+
 ## Citing the code
 
 If you use this code in your research, publications, or presentations, please include the following citation:
 
-	kastredux: http://www.github.com/aburgasser/kastredux
+	Burgasser (2025). aburgasser/kastredux (vXXX). Zenodo. https://doi.org/10.5281/zenodo.18333308
+
+or in bibtex:
+
+	@software{adam_burgasser_2026_18333308,
+	  author       = {Adam Burgasser},
+	  title        = {aburgasser/kastredux: vXXX},
+	  month        = jan,
+	  year         = 2026,
+	  publisher    = {Zenodo},
+	  version      = {v1.1},
+	  doi          = {10.5281/zenodo.18333308},
+	  url          = {https://doi.org/10.5281/zenodo.18333308},
+	}
+
+ where (vXXX) corresponds to the version used.
+
 
 
 
