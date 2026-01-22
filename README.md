@@ -114,7 +114,8 @@ You can check the initial centering of spectral traces by inspecting spatial pro
 	kr.profileCheck("data/input.txt",verbose=True)
 
 In addition to listing the source extraction centers (`verbose=True`), this function will produce a series of PDF files `diagnostic_profile_[NAME]_[RED/BLUE].pdf` which can be used to inspect spatial source centering.
-<img width="300" alt="profile" src="https://github.com/user-attachments/assets/7fe7f0f0-5ce2-4081-88f9-e2406d63e40e" />
+
+<img width="300" alt="profile" align="middle" src="https://github.com/user-attachments/assets/7fe7f0f0-5ce2-4081-88f9-e2406d63e40e" />
 
 Finally, there are additional keywords that can be added to the SOURCE lines to help with extraction:
 
@@ -132,19 +133,32 @@ The keywords `reset=True` means it will overwrite prior extractions, while `verb
 Assuming everything goes well, the following diagnostic plots will be generated to check the reductions:
 
 * `diagnostic_wavecal_[NAME]_[RED/BLUE].pdf`: two-panel plot showing the difference between arc line location and wavelength calibration fit (including RMS in Angstroms and km/s), and the arc spectrum as a function of wavelength with fit lines labeled.
-<img width="300" alt="wavecal" src="https://github.com/user-attachments/assets/c44c6462-2c22-440f-9ccf-5c30f218908e" />
+
+<img width="300" alt="wavecal" align="middle" src="https://github.com/user-attachments/assets/c44c6462-2c22-440f-9ccf-5c30f218908e" />
+
 * `diagnostic_trace_[NAME]_[RED/BLUE].pdf`: two-panel plot showing the trace (peak count pixel) as a function of X and Y pixel coordinate and the trace fit, and difference between peak pixels and trace fit
-<img width="300" alt="trace" src="https://github.com/user-attachments/assets/afa2e524-10bc-4670-a1ab-d907a4b36a24" />
+
+<img width="300" alt="trace" align="middle" src="https://github.com/user-attachments/assets/afa2e524-10bc-4670-a1ab-d907a4b36a24" />
+
 * `diagnostic_extraction_[NAME]_[RED/BLUE].pdf`: five-panel plot showing the spatial profile, extracted count rate, signal-to-noise, background count rate, and 2D image around source trace
-<img width="300" alt="extraction" src="https://github.com/user-attachments/assets/db541611-cf45-438e-bb7c-6651a8f8d4a5" />
+
+<img width="300" alt="extraction" align="middle" src="https://github.com/user-attachments/assets/db541611-cf45-438e-bb7c-6651a8f8d4a5" />
+
 * `diagnostic_fluxcal_[RED/BLUE].pdf`: two-panel plot showing the ratio of calibrated to observed count rate for the flux calibrator and correction fit, and comparing the calibrated, observed, and corrected flux calibrator spectra
-<img width="300" alt="fluxcal" src="https://github.com/user-attachments/assets/d3f0d0d1-dbe4-45b2-8baf-5d75bee01f15" />
+
+<img width="300" alt="fluxcal" align="middle" src="https://github.com/user-attachments/assets/d3f0d0d1-dbe4-45b2-8baf-5d75bee01f15" />
+
 * `diagnostic_telluric_[NAME]_[RED/BLUE].pdf`: two-panel plot illustrating the observed telluric spectrum with telluric regions masked, and the telluric correction spectrum.
-<img width="300" alt="telluric" src="https://github.com/user-attachments/assets/aad2f1ce-cabc-45f4-86f5-123cfe721097" />
+
+<img width="300" alt="telluric" align="middle" src="https://github.com/user-attachments/assets/aad2f1ce-cabc-45f4-86f5-123cfe721097" />
+
 * `diagnostic_reflux_[NAME]_[RED/BLUE].pdf`: two-panel plot showing the ratio of observed and model telluric spectrum and corresponding correction function, and comparing the model, observed, and corrected telluric spectra
-<img width="300" alt="reflux" src="https://github.com/user-attachments/assets/3807eb2a-cd2d-4a9a-9430-81f2f5a72cd7" />
+
+<img width="300" alt="reflux" align="middle" src="https://github.com/user-attachments/assets/3807eb2a-cd2d-4a9a-9430-81f2f5a72cd7" />
+
 * `kast[RED/BLUE]_[NAME]_[DATE].pdf`: Final spectrum
-<img width="300" alt="spectrum" src="https://github.com/user-attachments/assets/0d732265-64f8-4686-9d77-16a846214c2d" />
+
+<img width="300" alt="spectrum" align="middle" src="https://github.com/user-attachments/assets/0d732265-64f8-4686-9d77-16a846214c2d" />
 
 It is recommended to evaluate the diagnostic plots and adjust the instruction files as needed.
 
