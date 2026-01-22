@@ -3,7 +3,11 @@
 
 ## INSTALLATION NOTES
 
-`kastredux` can currently be installed as git clone:
+`kastredux` can be installed from pip:
+
+	pip install ucdmcmc
+
+or from git:
 
 	git clone https://github.com/aburgasser/kastredux.git
 	cd ucdmcmc
