@@ -34,38 +34,38 @@ It is recommended that you install in a conda environment to ensure the dependen
 
 The code includes spectrophotometric flux standards from 
 [Oke (1990)](https://ui.adsabs.harvard.edu/abs/1990AJ.....99.1621O)
-[Hamuy et al. (1992)  <a https://ui.adsabs.harvard.edu/abs/1992PASP..104..533H>] , and
-[Hamuy et al. (1994)  <a https://ui.adsabs.harvard.edu/abs/1994PASP..106..566H>];
+[Hamuy et al. (1992)](https://ui.adsabs.harvard.edu/abs/1992PASP..104..533H) , and
+[Hamuy et al. (1994)](a https://ui.adsabs.harvard.edu/abs/1994PASP..106..566H);
 see https://www.eso.org/sci/observing/tools/standards/spectra/okestandards.html and https://www.eso.org/sci/observing/tools/standards/spectra/hamuystandards.html
 
 ### Spectral standards
 
 * SDSS K and M dwarf. subdwarf, and giant spectral templates from 
-`Kesseli et al. (2017) <https://ui.adsabs.harvard.edu/abs/2017ApJS..230...16K>`_ and 
-`Kesseli et al. (2019) <https://ui.adsabs.harvard.edu/abs/2019AJ....157...63K>`_. 
+[Kesseli et al. (2017)](https://ui.adsabs.harvard.edu/abs/2017ApJS..230...16K) and 
+[Kesseli et al. (2019)](https://ui.adsabs.harvard.edu/abs/2019AJ....157...63K). 
 * SDSS M and L dwarf spectral templates from 
-`Bochanski et al. (2007) <https://ui.adsabs.harvard.edu/abs/2007AJ....133..531B>`_ and
-`Schmidt et al. (2014) <https://ui.adsabs.harvard.edu/abs/2014PASP..126..642S>`_.
+[Bochanski et al. (2007)](https://ui.adsabs.harvard.edu/abs/2007AJ....133..531B) and
+[Schmidt et al. (2014)](https://ui.adsabs.harvard.edu/abs/2014PASP..126..642S).
 * Low metallicity M subdwarf optical standards from 
-`Lepine et al. (2007) <https://ui.adsabs.harvard.edu/abs/2007ApJ...669.1235L>`_. 
+[Lepine et al. (2007)](https://ui.adsabs.harvard.edu/abs/2007ApJ...669.1235L). 
 * L dwarf optical standards from
-`Kirkpatrick et al. (1999) <https://ui.adsabs.harvard.edu/abs/1999ApJ...519..802K>`_. 
+[Kirkpatrick et al. (1999)](https://ui.adsabs.harvard.edu/abs/1999ApJ...519..802K). 
 * T dwarf optical standards from
-`Burgasser et al. (2003) <https://ui.adsabs.harvard.edu/abs/2003ApJ...594..510B>`_.
+[Burgasser et al. (2003)](https://ui.adsabs.harvard.edu/abs/2003ApJ...594..510B).
 
 ### Telluric standards
 
-OBAFGKM standards from the `Pickles (1998) library <https://ui.adsabs.harvard.edu/abs/1998PASP..110..863P>`_.
+OBAFGKM standards from the [Pickles (1998) library](https://ui.adsabs.harvard.edu/abs/1998PASP..110..863P).
 
 ### Sample spectra
 
 The code also includes reduced spectra form Kast for the following sources in *.fits format
 
-* `G 233-42 <https://simbad.cds.unistra.fr/simbad/sim-id?Ident=G+233-42&NbIdent=1&Radius=2&Radius.unit=arcmin&submit=submit+id>`_: M5 dwarf, G=14.0
-* `PM J0102+5254 <https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%409627359&Name=PM%20J01020%2b5254&submit=submit>`_: M3 dwarf G=12.5
-* `LP 555-25 <https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%404008479&Name=LP%20%20555-25&submit=submit>`_: M6.5 G=15.8
-* `TOI-2084 <https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%4017843263&Name=TOI-2084&submit=submit>`_: M2 G=14.4, data from `Barkaoui et al. (2003) <https://ui.adsabs.harvard.edu/abs/2023A%26A...677A..38B/abstract>`_
-* `LP 389-13 <https://simbad.cds.unistra.fr/simbad/sim-id?Ident=LP+389-13&NbIdent=1&Radius=2&Radius.unit=arcmin&submit=submit+id>`_: M2 G=11.6, data from `Rothermich et al. (2024) <https://ui.adsabs.harvard.edu/abs/2024AJ....167..253R/abstract>`_
+* [G 233-42](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=G+233-42&NbIdent=1&Radius=2&Radius.unit=arcmin&submit=submit+id): M5 dwarf, G=14.0
+* [PM J0102+5254](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%409627359&Name=PM%20J01020%2b5254&submit=submit): M3 dwarf G=12.5
+* [LP 555-25](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%404008479&Name=LP%20%20555-25&submit=submit): M6.5 G=15.8
+* [TOI-2084](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=%4017843263&Name=TOI-2084&submit=submit): M2 G=14.4, data from [Barkaoui et al. (2003)](https://ui.adsabs.harvard.edu/abs/2023A%26A...677A..38B/abstract)
+* [LP 389-13](https://simbad.cds.unistra.fr/simbad/sim-id?Ident=LP+389-13&NbIdent=1&Radius=2&Radius.unit=arcmin&submit=submit+id): M2 G=11.6, data from [Rothermich et al. (2024)](https://ui.adsabs.harvard.edu/abs/2024AJ....167..253R/abstract).
 
 ## Reduction
 
@@ -266,7 +266,7 @@ It is also possible to conduct reductions step-by-step if more control over the 
 
 ### Spectrum class
 
-The kastredux Spectrum class is the primary data object for spectral data, and is similar to the `astropy specutils <https://specutils.readthedocs.io/en/stable/>`_ class. In addition to arrays for wavelength, flux, uncertainty, variance and masking, the internal functions for the Spectrum class include:
+The kastredux Spectrum class is the primary data object for spectral data, and is similar to the [astropy specutils](https://specutils.readthedocs.io/en/stable/) class. In addition to arrays for wavelength, flux, uncertainty, variance and masking, the internal functions for the Spectrum class include:
 
 * spectral math: built in functions are provided to add, subtract, multiple, and divide spectra, accounting for the appropriate wavelength solution and uncertainty propagation
 * `scale(val)`: scale the flux and variance by a constant value
@@ -281,7 +281,7 @@ The kastredux Spectrum class is the primary data object for spectral data, and i
 * `applyWaveCal(wavecal)`: applies the wavelength calibration computed in `kr.waveCalibrateArcs()`
 * `applyFluxCal(fluxcal)`: applies the flux calibration computed in `kr.fluxCalibrate()`
 * `applyTelluricCal(tellcal)`: applies the telluric correction computed in `kr.telluricCalibrate()`
-* `redden(val)`: applies a reddening to a spectrum using the `Cardelli, Clayton, and Mathis (1989) <https://ui.adsabs.harvard.edu/abs/1989ApJ...345..245C/abstract>`_ model
+* `redden(val)`: applies a reddening to a spectrum using the [Cardelli, Clayton, and Mathis (1989)](https://ui.adsabs.harvard.edu/abs/1989ApJ...345..245C/abstract) model
 * `reset()`: reset the Spectrum object to its original read in state
 * `convertWave(unit)`: convert wavelength array to the given wavelength unit 
 * `convertFlux(unit)`: convert flux and uncertainty arrays to the given flux unit 
