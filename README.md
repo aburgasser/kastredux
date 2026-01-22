@@ -5,12 +5,12 @@
 
 `kastredux` can be installed from pip:
 
-	pip install ucdmcmc
+	pip install kastredux
 
 or from git:
 
 	git clone https://github.com/aburgasser/kastredux.git
-	cd ucdmcmc
+	cd kastredux
 	python -m setup.py install
 
 It is recommended that you install in a conda environment to ensure the dependencies do not conflict with installations of other packages
@@ -154,25 +154,25 @@ There are also a series of pickle (`*.pkl`) files containing intermediate data p
 It is also possible to conduct reductions step-by-step if more control over the process is desired with the following steps:
 
 1. Set up necessary information
-Start with import statements and the variables needed for your reduction
+Start with import statements and the variables needed for your reduction; the *f variables correspond to image frame numbers
 
 	import kastredux as kr
 	import numpy as np
 	import os
 
-	data_folder = "data" # data folder
-	reduction_folder = "reduction" # reduction folder
-	camera = "RED" # reducing red camera data
-	grating = "600/7500" # grating for red camera
-	prefix = "r" # file prefix
-	darkf1,darkf2 = 1000,1010 # dark frame numbers
-	baisf1,biasf2 = 1000,1010 # bias frame numbers
-	arcf = 1021 # arc frame number
-	scif1,scif2 = 1030,1031 # science frame numbers
+	data_folder = "data"
+	reduction_folder = "reduction"
+	camera = "RED"
+	grating = "600/7500"
+	prefix = "r"
+	darkf1,darkf2 = 1000,1010
+	baisf1,biasf2 = 1000,1010
+	arcf = 1021
+	scif1,scif2 = 1030,1031
 	sciname = "RedStar"
-	flxf = 1030 # flux cal frame number
+	flxf = 1030
 	flxname = "Hiltner600"
-	tellf = 1040 # telluric cal frame number
+	tellf = 1040
 	
 2. Generate calilbration frames
 First make the bias frame
