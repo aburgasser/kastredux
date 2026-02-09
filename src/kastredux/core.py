@@ -43,7 +43,7 @@ warnings.simplefilter('ignore', numpy.RankWarning)
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2026.01.21'
+VERSION = '2026.02.07'
 __version__ = VERSION
 CODE_PATH = os.path.dirname(os.path.abspath(__file__))
 GITHUB_URL = 'https://github.com/aburgasser/kastredux/'
@@ -73,58 +73,58 @@ print('Please report any errors are feature requests to our github page, {}\n\n'
 
 FLUXCALFOLDER = CODE_PATH+'/resources/flux_standards/'
 FLUXCALS = {
-	'BD25+4655': {'FILE' : 'fbd25d4655.dat','DESIGNATION': 'J21511102+2851504'}, # update designation
+	'BD25+4655': {'FILE' : 'fbd25d4655.dat','DESIGNATION': 'J21594202+2625581'},
 	'BD28+4211': {'FILE' : 'fbd28d4211.dat','DESIGNATION': 'J21511102+2851504'},
-	'BD33+2642': {'FILE' : 'fbd33d2642.dat','DESIGNATION': 'J21511102+2851504'}, # update designation
-	'BD75+325': {'FILE' : 'fbd75d325.dat','DESIGNATION': 'J21511102+2851504'}, # update designation
-	'CD32+9927': {'FILE' : 'fcd32d9927.dat','DESIGNATION': 'J10393674+4306092'}, # update designation
-	'CD34+241': {'FILE' : 'fcd34d241.dat','DESIGNATION': 'J10393674+4306092'}, # update designation
-	'EG21': {'FILE' : 'feg21.dat','DESIGNATION': 'J10393674+4306092'}, # update designation
-	'EG274': {'FILE' : 'feg274.dat','DESIGNATION': 'J10393674+4306092'}, # update designation
+	'BD33+2642': {'FILE' : 'fbd33d2642.dat','DESIGNATION': 'J15515986+3256548'},
+	'BD75+325': {'FILE' : 'fbd75d325.dat','DESIGNATION': 'J08104931+7457575'}, 
+	'CD32+9927': {'FILE' : 'fcd32d9927.dat','DESIGNATION': 'J14114637-3303143'}, 
+	'CD34+241': {'FILE' : 'fcd34d241.dat','DESIGNATION': 'J00414692-3339085'}, 
+	'EG21': {'FILE' : 'feg21.dat','DESIGNATION': 'J03103098-6836022'}, 
+	'EG274': {'FILE' : 'feg274.dat','DESIGNATION': 'J16233375-3913475'},
 	'FEIGE34': {'FILE' : 'ffeige34.dat','DESIGNATION': 'J10393674+4306092'},
-	'FEIGE56': {'FILE' : 'ffeige56.dat','DESIGNATION': 'J12372352+2503598'}, # update designation
+	'FEIGE56': {'FILE' : 'ffeige56.dat','DESIGNATION': 'J12064725+1140127'}, 
 	'FEIGE66': {'FILE' : 'ffeige66.dat','DESIGNATION': 'J12372352+2503598'},
 	'FEIGE67': {'FILE' : 'ffeige67.dat','DESIGNATION': 'J12415179+1731197'},
 	'FEIGE110': {'FILE' : 'ffeige110.dat','DESIGNATION': 'J23195840-0509561'},
-	'G24-9': {'FILE' : 'fg24_9.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'G60-54': {'FILE' : 'fg60_54.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'G138-31': {'FILE' : 'fg138_31.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'G158-100': {'FILE' : 'fg158_100.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'G191B2B': {'FILE' : 'fg191b2b.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'G193-74': {'FILE' : 'fg193_74.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'GD50': {'FILE' : 'fgd50.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'GD108': {'FILE' : 'fgd108.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'GD248': {'FILE' : 'fgd248.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HD93521': {'FILE' : 'fhd93521.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
+	'G24-9': {'FILE' : 'fg24_9.dat','DESIGNATION': 'J20135605+0642552'},
+	'G60-54': {'FILE' : 'fg60_54.dat','DESIGNATION': 'J13000953+0328557'},
+	'G138-31': {'FILE' : 'fg138_31.dat','DESIGNATION': 'J16275359+0912245'}, 
+	'G158-100': {'FILE' : 'fg158_100.dat','DESIGNATION': 'J00335432-1207571'}, 
+	'G191B2B': {'FILE' : 'fg191b2b.dat','DESIGNATION': 'J05053062+5249540'},
+	'G193-74': {'FILE' : 'fg193_74.dat','DESIGNATION': 'J07532740+5229357'},
+	'GD50': {'FILE' : 'fgd50.dat','DESIGNATION': 'J03485006-0058304'}, 
+	'GD108': {'FILE' : 'fgd108.dat','DESIGNATION': 'J10004733-0733312'},
+	'GD248': {'FILE' : 'fgd248.dat','DESIGNATION': 'J23260669+1600214'},
+	'HD93521': {'FILE' : 'fhd93521.dat','DESIGNATION': 'J10482351+3734128'}, 
 	'HILTNER600': {'FILE' : 'fhilt600.dat','DESIGNATION': 'J06451337+0208146'},
-	'HR718': {'FILE' : 'fhr718.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HR1544': {'FILE' : 'fhr1544.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HR3454': {'FILE' : 'fhr3454.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HR4468': {'FILE' : 'fhr4468.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HR4963': {'FILE' : 'fhr4963.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HR5501': {'FILE' : 'fhr5501.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HR7596': {'FILE' : 'fhr7596.dat','DESIGNATION': 'J19544479+0016248'},
-	'HR7950': {'FILE' : 'fhr7950.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HR8634': {'FILE' : 'fhr8634.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HR9087': {'FILE' : 'fhr9087.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HZ4': {'FILE' : 'fhz4.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HZ21': {'FILE' : 'fhz21.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'HZ44': {'FILE' : 'fhz44.dat','DESIGNATION': 'J19544479+0016248'}, # update designation
-	'LTT745': {'FILE' : 'fltt745.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT1020': {'FILE' : 'fltt1020.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT1788': {'FILE' : 'fltt1788.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT2415': {'FILE' : 'fltt2415.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT3218': {'FILE' : 'fltt3218.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT3864': {'FILE' : 'fltt3864.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT4364': {'FILE' : 'fltt4364.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT4816': {'FILE' : 'fltt4816.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT6248': {'FILE' : 'fltt6248.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT7379': {'FILE' : 'fltt7379.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
+	'HR718': {'FILE' : 'fhr718.dat','DESIGNATION': 'J02280954+0827362'}, 
+	'HR1544': {'FILE' : 'fhr1544.dat','DESIGNATION': 'J04503669+0854007'},
+	'HR3454': {'FILE' : 'fhr3454.dat','DESIGNATION': 'J08431346+0323551'},
+	'HR4468': {'FILE' : 'fhr4468.dat','DESIGNATION': 'J11364091-0948082'},
+	'HR4963': {'FILE' : 'fhr4963.dat','DESIGNATION': 'J13095696-0532205'},
+	'HR5501': {'FILE' : 'fhr5501.dat','DESIGNATION': 'J14453025+0043027'},
+	'HR7596': {'FILE' : 'fhr7596.dat','DESIGNATION': 'J19544480+0016246'},
+	'HR7950': {'FILE' : 'fhr7950.dat','DESIGNATION': 'J20474055-0929447'},
+	'HR8634': {'FILE' : 'fhr8634.dat','DESIGNATION': 'J22412764+1049532'},
+	'HR9087': {'FILE' : 'fhr9087.dat','DESIGNATION': 'J00014942-0301390'},
+	'HZ4': {'FILE' : 'fhz4.dat','DESIGNATION': 'J03552170+0947187'}, 
+	'HZ21': {'FILE' : 'fhz21.dat','DESIGNATION': 'J12135642+3256308'},
+	'HZ44': {'FILE' : 'fhz44.dat','DESIGNATION': 'J13233537+3608000'},
+	'LTT745': {'FILE' : 'fltt745.dat','DESIGNATION': 'J01213459-4139230'}, 
+	'LTT1020': {'FILE' : 'fltt1020.dat','DESIGNATION': 'J01544968-2728297'}, 
+	'LTT1788': {'FILE' : 'fltt1788.dat','DESIGNATION': 'J03482217-3908336'}, 
+	'LTT2415': {'FILE' : 'fltt2415.dat','DESIGNATION': 'J05562430-2751288'}, 
+	'LTT3218': {'FILE' : 'fltt3218.dat','DESIGNATION': 'J08413237-3256329'}, 
+	'LTT3864': {'FILE' : 'fltt3864.dat','DESIGNATION': 'J10321390-3537424'}, 
+	'LTT4364': {'FILE' : 'fltt4364.dat','DESIGNATION': 'J11454292-6450295'}, 
+	'LTT4816': {'FILE' : 'fltt4816.dat','DESIGNATION': 'J12385094-4947588'},
+	'LTT6248': {'FILE' : 'fltt6248.dat','DESIGNATION': 'J15390002-2835331'},
+	'LTT7379': {'FILE' : 'fltt7379.dat','DESIGNATION': 'J18362629-4418330'},
 	'LTT7987': {'FILE' : 'fltt7987.dat','DESIGNATION': 'J20105686-3013064'},
-	'LTT9239': {'FILE' : 'fltt9239.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'LTT9491': {'FILE' : 'fltt9491.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'NGC7293': {'FILE' : 'fngc7293.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
-	'SA95-42': {'FILE' : 'fsa95_42.dat','DESIGNATION': 'J20105686-3013064'}, # update designation
+	'LTT9239': {'FILE' : 'fltt9239.dat','DESIGNATION': 'J22524088-2035263'},
+	'LTT9491': {'FILE' : 'fltt9491.dat','DESIGNATION': 'J23193498-1705298'},
+	'NGC7293': {'FILE' : 'fngc7293.dat','DESIGNATION': 'J22293846-2050133'}, 
+	'SA95-42': {'FILE' : 'fsa95_42.dat','DESIGNATION': 'J03534367-00 04330'},
 	'PG1708+602': {'FILE' : 'fpg1708602.dat','DESIGNATION': 'J17091588+6010108'},
 }
 
@@ -1407,8 +1407,11 @@ class Spectrum(object):
 			output = tuple(output)
 			data = numpy.vstack(output)
 			hdu = fits.PrimaryHDU(data)
+			hdu.verify('silentfix')
 			for k in list(self.header.keys()):
 				if k.upper() not in ['SIMPLE','HISTORY','COMMENT','BITPIX','NAXIS','NAXIS1','NAXIS2','EXTEND'] and k.replace('#','') != '': # and k not in list(hdu.header.keys()):
+# unknown error 2/7/26 - still checking
+#					print(k,self.header[k])
 					hdu.header[k] = str(self.header[k])
 			for k in list(self.__dict__.keys()):
 				if isinstance(getattr(self,k),str) == True or isinstance(getattr(self,k),int) == True or isinstance(getattr(self,k),bool) == True or (isinstance(getattr(self,k),float) == True and numpy.isnan(getattr(self,k)) == False):
@@ -2312,6 +2315,7 @@ def readFiles(num,folder='./',mode='RED',prefix='',suffix='',rotate=False,trim=[
 		if not os.path.exists(f): print('Warning: cannot find data file {}; skipping'.format(f))
 		else:
 			hdulist = fits.open(f)
+			hdulist.verify('silentfix')
 			im = hdulist[0].data
 			hdr = hdulist[0].header
 			hdulist.close()
@@ -2581,7 +2585,7 @@ def makeInstructions(folder,outfolder='',red_file='input.txt',blue_file='input_b
 		dp['select'] = dp['EXPTIME']==0
 		dp.loc[dp['select']==True,'Obstype'] = 'Bias'
 
-# identify telluric sources based on just on leading HD or HIP (faulty)		
+# identify telluric sources based on just on leading HD or HIP (note: this is faulty)		
 		dp['select'] = [x[:2].upper()=='HD' for x in dp['OBJECT']]
 		dp.loc[dp['select']==True,'Obstype'] = 'Telluric'
 		dp['select'] = [x[:3].upper()=='HIP' for x in dp['OBJECT']]
@@ -4109,7 +4113,7 @@ def profileCheck(instructions='',cntr=335,verbose=ERROR_CHECKING,trace_slice=[25
 
 
 # full reduction pipeline
-def reduce(redux={},parameters={},instructions='input.txt',bias_file='',flat_file='',mask_file='',cal_wave_file='',cal_flux_file='',reset=False,verbose=ERROR_CHECKING,src_wnd=5,bck_wnd=[15,20],fit_order=5,overwrite=True,**kwargs):
+def reduce(instructions='input.txt',redux={},parameters={},bias_file='',flat_file='',mask_file='',cal_wave_file='',cal_flux_file='',reset=False,verbose=ERROR_CHECKING,src_wnd=5,bck_wnd=[15,20],fit_order=5,overwrite=True,**kwargs):
 	'''
 	Full reduction package
 	'''
