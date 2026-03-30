@@ -43,7 +43,7 @@ warnings.simplefilter('ignore', numpy.RankWarning)
 ############################################################
 
 NAME = 'kastredux'
-VERSION = '2026.02.07'
+VERSION = '2026.03.30'
 __version__ = VERSION
 CODE_PATH = os.path.dirname(os.path.abspath(__file__))
 GITHUB_URL = 'https://github.com/aburgasser/kastredux/'
@@ -2512,19 +2512,33 @@ def makeInstructions(folder,outfolder='',red_file='input.txt',blue_file='input_b
 	'''
 # SETUP
 	fileinfo = {
-		'SLIT': 'SLIT_N',
-		'DISPERSER': 'GRATNG_N',
-		'DATE-OBS': 'DATE-OBS',
-		'OBSERVER': 'OBSERVER',
-		'OBJECT': 'OBJECT',
-		'RA': 'RA',
-		'DEC': 'DEC',
-		'HA': 'HA',
-		'AIRMASS': 'AIRMASS',
-		'EXPTIME': 'EXPTIME',
+		'SLIT': ['SLIT_N',str],
+		'DISPERSER': ['GRATNG_N',str],
+		'DATE-OBS': ['DATE-OBS',str],
+		'OBSERVER': ['OBSERVER',str],
+		'OBJECT': ['OBJECT',str],
+		'RA': ['RA',str],
+		'DEC': ['DEC',str],
+		'HA': ['HA',str],
+		'AIRMASS': ['AIRMASS',float],
+		'EXPTIME': ['EXPTIME',float],
 	}
-	for x in 'ABCDEFGH': fileinfo['ARCLAMP{}'.format(x)] = 'LAMPSTA{}'.format(x)
-	for x in '12345': fileinfo['FLATLAMP{}'.format(x)] = 'LAMPSTA{}'.format(x)
+	for x in 'ABCDEFGH': fileinfo['ARCLAMP{}'.format(x)] = ['LAMPSTA{}'.format(x),str]
+	for x in '12345': fileinfo['FLATLAMP{}'.format(x)] = ['LAMPSTA{}'.format(x),str]
+	# fileinfo = {
+	# 	'SLIT': 'SLIT_N',
+	# 	'DISPERSER': 'GRATNG_N',
+	# 	'DATE-OBS': 'DATE-OBS',
+	# 	'OBSERVER': 'OBSERVER',
+	# 	'OBJECT': 'OBJECT',
+	# 	'RA': 'RA',
+	# 	'DEC': 'DEC',
+	# 	'HA': 'HA',
+	# 	'AIRMASS': 'AIRMASS',
+	# 	'EXPTIME': 'EXPTIME',
+	# }
+	# for x in 'ABCDEFGH': fileinfo['ARCLAMP{}'.format(x)] = 'LAMPSTA{}'.format(x)
+	# for x in '12345': fileinfo['FLATLAMP{}'.format(x)] = 'LAMPSTA{}'.format(x)
 
 # check files and paths
 	if os.path.exists(folder)==False: raise ValueError('Cannot find data folder {}'.format(folder))
@@ -2558,18 +2572,20 @@ def makeInstructions(folder,outfolder='',red_file='input.txt',blue_file='input_b
 		dp['File'] = [d.split('/')[-1] for d in dfiles]
 		dp['Filenumber'] = [int((d.split('.')[0]).replace(defaults[mode]['prefix'],'')) for d in dp['File']]
 		dp.sort_values('Filenumber',inplace=True)
-		dp.reset_index(inplace=True)
+		dp.reset_index(inplace=True,drop=True)
 		for k in list(fileinfo.keys()): dp[k] = ['']*len(dp)
 		for i,d in enumerate(dp['File']):
-			hdu = fits.open(folder+d)
+			hdu = fits.open(os.path.join(folder,d))
 			hdu.verify('silentfix')
 			h = hdu[0].header
 			hdu.close()
-			for k in list(fileinfo.keys()): dp[k].iloc[i] = h[fileinfo[k]]
-		dp['OBJECT'] = [x.replace(' ','') for x in dp['OBJECT']]
+#			for k in list(fileinfo.keys()): dp[k].iloc[i] = h[fileinfo[k]]
+			for k in list(fileinfo.keys()): dp.loc[i,k] = str(h[fileinfo[k][0]])
+		for k in list(fileinfo.keys()): dp[k] = dp[k].astype(fileinfo[k][1])
+		dp['OBJECT'] = [str(x).replace(' ','') for x in dp['OBJECT']]
 		dp['Obstype'] = ['Science']*len(dp)
-		dp['Coordinate'] = [properCoordinates(dp['RA'].iloc[i]+' '+dp['DEC'].iloc[i]) for i in range(len(dp))]
-		date = str(dp['DATE-OBS'].iloc[0])[:10]
+		dp['Coordinate'] = [properCoordinates(str(dp.loc[i,'RA'])+' '+str(dp.loc[i,'DEC'])) for i in range(len(dp))]
+		date = str(dp.loc[0,'DATE-OBS'])[:10]
 
 # establish which ones are arc lamps => arc lamps on
 		dp['select'] = ['']*len(dp)
@@ -2582,7 +2598,7 @@ def makeInstructions(folder,outfolder='',red_file='input.txt',blue_file='input_b
 		dp['select'] = ['on' in x for x in dp['select']]
 		dp.loc[dp['select']==True,'Obstype'] = 'Flat'
 # establish which ones are biases => exposure = 0
-		dp['select'] = dp['EXPTIME']==0
+		dp['select'] = dp['EXPTIME']==0.
 		dp.loc[dp['select']==True,'Obstype'] = 'Bias'
 
 # identify telluric sources based on just on leading HD or HIP (note: this is faulty)		
@@ -2592,13 +2608,15 @@ def makeInstructions(folder,outfolder='',red_file='input.txt',blue_file='input_b
 		dp.loc[dp['select']==True,'Obstype'] = 'Telluric'
 # identify unique sources from object names (exclude Arc, Flat, Bias)
 		dps = dp[dp['Obstype']=='Science']
+		dps.reset_index(inplace=True,drop=True)
 		names = list(set(list(dps['OBJECT'])))
 		names.sort()
 # identify fluxcal if present based on proximity to established flux cals
 		for n in names:
 			dps = dp[dp['OBJECT']==n]
+			dps.reset_index(inplace=True,drop=True)
 			for k in list(FLUXCALS.keys()):
-				if (dps['Coordinate'].iloc[0]).separation(properCoordinates(FLUXCALS[k]['DESIGNATION'])).to(u.arcsec).value < 30: 
+				if (dps.loc[0,'Coordinate']).separation(properCoordinates(FLUXCALS[k]['DESIGNATION'])).to(u.arcsec).value < 30: 
 					dp.loc[dp['OBJECT']==n,'Obstype'] = 'Fluxcal'
 					dp.loc[dp['OBJECT']==n,'OBJECT'] = k
 		if len(dp[dp['Obstype']=='Fluxcal'])==0 and verbose==True: print('Warning: no flux calibrator identified')
@@ -2613,10 +2631,12 @@ def makeInstructions(folder,outfolder='',red_file='input.txt',blue_file='input_b
 		for n in names:
 #			print(n)
 			dpn = dp[dp['OBJECT']==n]
+			dpn.reset_index(inplace=True,drop=True)
 			sep = []
 			for t in tellurics:
 				dpt = dp[dp['OBJECT']==t]
-				sep.append((dpn['Coordinate'].iloc[0]).separation(dpt['Coordinate'].iloc[0]).to(u.arcsec).value)
+				dpt.reset_index(inplace=True,drop=True)
+				sep.append((dpn.loc[0,'Coordinate']).separation(dpt.loc[0,'Coordinate']).to(u.arcsec).value)
 			if len(sep)>0: dp.loc[dp['OBJECT']==n,'Telluric'] = tellurics[numpy.argmin(sep)]
 
 # populate file
@@ -2628,35 +2648,43 @@ def makeInstructions(folder,outfolder='',red_file='input.txt',blue_file='input_b
 		f.write('DATA_FOLDER\t{}\n'.format(folder))
 		f.write('REDUCTION_FOLDER\t{}\n'.format(outfolder))
 		dps = dp[dp['Obstype']=='Arc']
-		f.write('ARC_SHALLOW\tFILES={}\tLAMPS={}\n'.format(dps['Filenumber'].iloc[0],defaults[mode]['lamps']))
-		f.write('ARC_DEEP\tFILES={}\tLAMPS={}\n'.format(dps['Filenumber'].iloc[-1],defaults[mode]['lamps']))
+		dps.reset_index(inplace=True,drop=True)
+		f.write('ARC_SHALLOW\tFILES={}\tLAMPS={}\n'.format(dps.loc[0,'Filenumber'],defaults[mode]['lamps']))
+		f.write('ARC_DEEP\tFILES={}\tLAMPS={}\n'.format(dps.loc[dps.index[-1],'Filenumber',],defaults[mode]['lamps']))
 		dps = dp[dp['Obstype']=='Flat']
 		f.write('FLAT\tFILES={:.0f}-{:.0f}\n'.format(numpy.nanmin(dps['Filenumber']),numpy.nanmax(dps['Filenumber'])))
 		dps = dp[dp['Obstype']=='Bias']
+		if len(dps)==0: dps = dp[dp['Obstype']=='DARK']
+		if len(dps)==0: dps = dp[dp['Obstype']=='DARK']
 		f.write('BIAS\tFILES={:.0f}-{:.0f}\n'.format(numpy.nanmin(dps['Filenumber']),numpy.nanmax(dps['Filenumber'])))
 		dps = dp[dp['Obstype']=='Fluxcal']
+		dps.reset_index(inplace=True,drop=True)
 		if len(dps)>0: 
-			st = 'FLUXCAL\tNAME={}'.format(dps['OBJECT'].iloc[0])
+			st = 'FLUXCAL\tNAME={}'.format(dps.loc[0,'OBJECT'])
 			st = st+'\tFILES={:.0f}-{:.0f}'.format(numpy.nanmin(dps['Filenumber']),numpy.nanmax(dps['Filenumber']))
 			st = st+'\tCENTER={:.0f}'.format(defaults[mode]['center'])
 			st = st+'\tWINDOW=15\tBACK=25,45\tMETHOD=BOXCAR'
 			f.write(st+'\n')
 		dps = dp[dp['Obstype']=='Science']
+		dps.reset_index(inplace=True,drop=True)
 		names = list(set(list(dps['OBJECT'])))
 		names.sort()
 		for n in names:
 			dpss = dps[dps['OBJECT']==n]
+			dpss.reset_index(inplace=True,drop=True)
 			st = 'SOURCE\tNAME={}'.format(n)
 			st = st+'\tFILES={:.0f}-{:.0f}'.format(numpy.nanmin(dpss['Filenumber']),numpy.nanmax(dpss['Filenumber']))
 			st = st+'\tCENTER={:.0f}'.format(defaults[mode]['center'])
 			st = st+'\tWINDOW=10\tBACK=20,40\tMETHOD=BOXCAR'
-			if dps['Telluric'].iloc[0]!='': st = st+'\tTELLURIC={}'.format(dpss['Telluric'].iloc[0])
+			if dps.loc[0,'Telluric']!='': st = st+'\tTELLURIC={}'.format(dpss.loc[0,'Telluric'])
 			f.write(st+'\n')
 		dps = dp[dp['Obstype']=='Telluric']
+		dps.reset_index(inplace=True,drop=True)
 		names = list(set(list(dps['OBJECT'])))
 		names.sort()
 		for n in names:
 			dpss = dps[dps['OBJECT']==n]
+			dpss.reset_index(inplace=True,drop=True)
 			st = 'TELLURIC\tNAME={}'.format(n)
 			st = st+'\tFILES={:.0f}-{:.0f}'.format(numpy.nanmin(dpss['Filenumber']),numpy.nanmax(dpss['Filenumber']))
 			st = st+'\tCENTER={:.0f}'.format(defaults[mode]['center'])
@@ -6076,7 +6104,4 @@ def theWorks(sp,measure_classification=True,classification_plot='',classificatio
 
 		
 	return output
-
-
-
 
